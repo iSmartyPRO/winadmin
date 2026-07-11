@@ -20,7 +20,7 @@ public sealed class EventLogService : IEventLogService
     {
         try
         {
-            var session = new EventLogSession();
+            using var session = new EventLogSession();
             return session.GetLogNames().OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToList();
         }
         catch (Exception ex)
@@ -61,7 +61,11 @@ public sealed class EventLogService : IEventLogService
                     if (!EventLogQueryHelpers.MatchesSubstring(message, request.Keyword))
                         continue;
 
-                    var user = EventLogQueryHelpers.ExtractUserNameFromXml(record.ToXml())
+                    string? xml;
+                    try { xml = record.ToXml(); }
+                    catch (EventLogException) { xml = null; }
+
+                    var user = EventLogQueryHelpers.ExtractUserNameFromXml(xml)
                         ?? TryTranslateSid(record.UserId);
 
                     if (!EventLogQueryHelpers.MatchesSubstring(user, request.User))
