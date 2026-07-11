@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using WinAdmin.Core.Abstractions;
 using WinAdmin.Core.Models;
 using WinAdmin.Infrastructure.Disks;
+using WinAdmin.Infrastructure.EventLogs;
 using WinAdmin.Infrastructure.Power;
 using WinAdmin.Infrastructure.Printers;
 using WinAdmin.Infrastructure.Processes;
@@ -33,6 +34,7 @@ public static class DependencyInjection
         services.AddScoped<IProcessService, ProcessService>();
         services.AddScoped<IPrinterService, PrinterService>();
         services.AddScoped<IPowerService, PowerService>();
+        services.AddScoped<IEventLogService, EventLogService>();
 
         services.AddScoped<IApiKeyService, ApiKeyService>();
         services.AddScoped<IAuditService, AuditService>();

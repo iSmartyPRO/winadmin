@@ -37,3 +37,9 @@ public interface IPowerService
     OperationResult Shutdown(PowerRequest request);
     OperationResult CancelPending();
 }
+
+public interface IEventLogService
+{
+    IReadOnlyList<string> GetLogNames();
+    EventLogQueryResult Query(EventLogQueryRequest request);
+}
