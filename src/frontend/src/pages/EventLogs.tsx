@@ -36,6 +36,13 @@ function quickRange(hours: number): [Dayjs, Dayjs] {
 
 export default function EventLogs() {
   const { presetKey } = useParams<{ presetKey: string }>()
+  // Мontируем EventLogsView заново при каждой смене пресета: свежий useState
+  // уже инициализируется значениями нового пресета, без гонок между эффектами
+  // сброса и повторного запроса.
+  return <EventLogsView key={presetKey} presetKey={presetKey} />
+}
+
+function EventLogsView({ presetKey }: { presetKey?: string }) {
   const isCustom = presetKey === 'custom'
   const preset = findPreset(presetKey)
 
@@ -48,17 +55,6 @@ export default function EventLogs() {
   const [keyword, setKeyword] = useState('')
   const [user, setUser] = useState('')
   const [detail, setDetail] = useState<EventLogEntryDto | null>(null)
-
-  // Сброс фильтров при смене пресета/маршрута
-  useEffect(() => {
-    setLogName(preset?.logName ?? '')
-    setEventIds(preset?.eventIds?.join(',') ?? '')
-    setRange(quickRange(24))
-    setMaxRecords(200)
-    setLevels([])
-    setKeyword('')
-    setUser('')
-  }, [presetKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (isCustom) api.eventLogs.logNames().then(setLogNames).catch(() => setLogNames([]))
@@ -80,15 +76,18 @@ export default function EventLogs() {
     })
   })
 
-  // Автозапрос при смене журнала (пресет применился или выбран в кастомном режиме)
+  // Автозапрос при выборе журнала в кастомном режиме (смена пресета уже
+  // обрабатывается ремонтом всего компонента по ключу presetKey, поэтому
+  // здесь остаётся только один сценарий: пользователь меняет logName через
+  // Select, оставаясь на том же смонтированном инстансе).
   const isFirstRender = useRef(true)
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false
       return
     }
-    if (logName) refresh()
-  }, [presetKey, logName]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (isCustom && logName) refresh()
+  }, [logName]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const columns: ColumnsType<EventLogEntryDto> = [
     { title: 'Время', dataIndex: 'timeCreated', render: (d: string) => formatDateTime(d), width: 180 },
