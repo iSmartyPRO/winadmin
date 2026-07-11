@@ -152,3 +152,33 @@ export interface MeResponse {
   login: string
   scopes: string[]
 }
+
+export interface EventLogEntryDto {
+  id: number
+  timeCreated: string
+  logName: string
+  providerName?: string
+  eventId: number
+  level?: string
+  levelDisplayName?: string
+  user?: string
+  message?: string
+  machineName?: string
+}
+
+export interface EventLogQueryParams {
+  logName: string
+  start: string
+  end: string
+  maxRecords?: number
+  eventIds?: string
+  levels?: string
+  keyword?: string
+  user?: string
+}
+
+export interface EventLogQueryResult {
+  entries: EventLogEntryDto[]
+  truncated: boolean
+  scannedCount: number
+}

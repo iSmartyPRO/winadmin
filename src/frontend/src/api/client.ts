@@ -5,6 +5,7 @@ import type {
   PhysicalDisk, PrinterInfo, ProcessInfo, ServiceInfo,
   SystemInfo, SystemMetrics, PowerRequest, UserDto,
   CreateUserRequest, TokenResponse,
+  EventLogQueryParams, EventLogQueryResult,
 } from './types'
 
 // ── JWT storage (sessionStorage — очищается при закрытии вкладки) ──
@@ -106,6 +107,12 @@ export const api = {
   setUserActive: (id: string, isActive: boolean) =>
     http.put(`/users/${id}/active`, { isActive }),
   deleteUser: (id: string) => http.delete(`/users/${id}`),
+
+  eventLogs: {
+    logNames: () => http.get<string[]>('/eventlogs/lognames').then((r) => r.data),
+    query: (params: EventLogQueryParams) =>
+      http.get<EventLogQueryResult>('/eventlogs/query', { params }).then((r) => r.data),
+  },
 }
 
 // Re-export MeResponse, TokenResponse for consumers
