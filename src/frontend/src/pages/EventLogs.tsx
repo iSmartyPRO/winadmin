@@ -1,5 +1,5 @@
 // src/frontend/src/pages/EventLogs.tsx
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   Alert, Button, Card, DatePicker, Input, Modal, Select, Space, Table, Tag, Typography,
@@ -64,21 +64,31 @@ export default function EventLogs() {
     if (isCustom) api.eventLogs.logNames().then(setLogNames).catch(() => setLogNames([]))
   }, [isCustom])
 
-  const { data, loading, error, refresh } = useApi(() => api.eventLogs.query({
-    logName,
-    start: range[0].toISOString(),
-    end: range[1].toISOString(),
-    maxRecords,
-    eventIds: eventIds || undefined,
-    levels: levels.length ? levels.join(',') : undefined,
-    keyword: keyword || undefined,
-    user: user || undefined,
-  }))
+  const { data, loading, error, refresh } = useApi(() => {
+    if (!logName) {
+      return Promise.resolve({ entries: [], truncated: false, scannedCount: 0 })
+    }
+    return api.eventLogs.query({
+      logName,
+      start: range[0].toISOString(),
+      end: range[1].toISOString(),
+      maxRecords,
+      eventIds: eventIds || undefined,
+      levels: levels.length ? levels.join(',') : undefined,
+      keyword: keyword || undefined,
+      user: user || undefined,
+    })
+  })
 
   // Автозапрос при смене журнала (пресет применился или выбран в кастомном режиме)
+  const isFirstRender = useRef(true)
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false
+      return
+    }
     if (logName) refresh()
-  }, [logName]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [presetKey, logName]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const columns: ColumnsType<EventLogEntryDto> = [
     { title: 'Время', dataIndex: 'timeCreated', render: (d: string) => formatDateTime(d), width: 180 },
