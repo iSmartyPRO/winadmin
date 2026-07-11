@@ -65,7 +65,7 @@ public sealed class EventLogService : IEventLogService
                     try { xml = record.ToXml(); }
                     catch (EventLogException) { xml = null; }
 
-                    var user = EventLogQueryHelpers.ExtractUserNameFromXml(xml)
+                    var user = (xml != null ? EventLogQueryHelpers.ExtractUserNameFromXml(xml) : null)
                         ?? TryTranslateSid(record.UserId);
 
                     if (!EventLogQueryHelpers.MatchesSubstring(user, request.User))
