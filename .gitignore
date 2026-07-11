@@ -1,0 +1,29 @@
+# .NET
+bin/
+obj/
+*.user
+publish/
+
+# БД и секреты (создаются в рантайме)
+*.db
+*.db-shm
+*.db-wal
+bootstrap-key.txt
+appsettings.Production.json
+
+# Node / Vite
+node_modules/
+web/dist/
+
+# Собранный SPA (генерируется из web/ — пересобирается при publish)
+src/SysPanel.Api/wwwroot/assets/
+src/SysPanel.Api/wwwroot/index.html
+
+# Логи
+logs/
+run.log
+*.log
+
+# IDE
+.vs/
+.idea/

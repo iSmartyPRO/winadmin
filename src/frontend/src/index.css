@@ -1,0 +1,53 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(79, 124, 255, 0.12), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgba(120, 80, 255, 0.1), transparent 55%),
+    #0d1117;
+  font-family: 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #2a3242;
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3a4356;
+}
+
+.sp-glass {
+  background: linear-gradient(180deg, rgba(28, 34, 48, 0.7), rgba(22, 27, 34, 0.7));
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sp-fade-in {
+  animation: spFadeIn 0.35s ease both;
+}
+@keyframes spFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

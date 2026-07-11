@@ -1,0 +1,10 @@
+﻿<Solution>
+  <Folder Name="/backend/">
+    <Project Path="src/backend/WinAdmin.Api/WinAdmin.Api.csproj" />
+    <Project Path="src/backend/WinAdmin.Core/WinAdmin.Core.csproj" />
+    <Project Path="src/backend/WinAdmin.Infrastructure/WinAdmin.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="src/tests/WinAdmin.Tests/WinAdmin.Tests.csproj" />
+  </Folder>
+</Solution>
