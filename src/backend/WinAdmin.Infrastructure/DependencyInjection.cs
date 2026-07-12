@@ -10,6 +10,7 @@ using WinAdmin.Infrastructure.Processes;
 using WinAdmin.Infrastructure.Security;
 using WinAdmin.Infrastructure.Services;
 using WinAdmin.Infrastructure.Settings;
+using WinAdmin.Infrastructure.Software;
 using WinAdmin.Infrastructure.Storage;
 using WinAdmin.Infrastructure.MachineInfo;
 
@@ -36,6 +37,7 @@ public static class DependencyInjection
         services.AddScoped<IPrinterService, PrinterService>();
         services.AddScoped<IPowerService, PowerService>();
         services.AddScoped<IEventLogService, EventLogService>();
+        services.AddScoped<ISoftwareCatalogService, SoftwareCatalogService>();
 
         services.AddScoped<IApiKeyService, ApiKeyService>();
         services.AddScoped<IAuditService, AuditService>();
