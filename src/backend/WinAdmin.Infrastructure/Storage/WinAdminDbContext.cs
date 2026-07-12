@@ -12,6 +12,7 @@ public sealed class WinAdminDbContext : DbContext
     public DbSet<AuditEntryEntity> AuditEntries => Set<AuditEntryEntity>();
     public DbSet<UserEntity> Users => Set<UserEntity>();
     public DbSet<RefreshTokenEntity> RefreshTokens => Set<RefreshTokenEntity>();
+    public DbSet<ExcludedUserEntity> ExcludedUsers => Set<ExcludedUserEntity>();
 
     // SQLite не умеет ORDER BY по DateTimeOffset — храним как UTC-тики (long),
     // что сортируемо и сохраняет момент времени.
@@ -67,6 +68,14 @@ public sealed class WinAdminDbContext : DbContext
             e.HasOne(x => x.User).WithMany(x => x.RefreshTokens)
                 .HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         });
+
+        modelBuilder.Entity<ExcludedUserEntity>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.UserName).IsRequired().HasMaxLength(256);
+            e.HasIndex(x => x.UserName).IsUnique();
+            e.Property(x => x.CreatedAt).HasConversion(DtoConverter);
+        });
     }
 }
 
@@ -120,5 +129,13 @@ public sealed class RefreshTokenEntity
     public string TokenHash { get; set; } = "";
     public DateTimeOffset ExpiresAt { get; set; }
     public DateTimeOffset? RevokedAt { get; set; }
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+/// <summary>Учётная запись, скрываемая из журналов событий (глобальный чёрный список настроек).</summary>
+public sealed class ExcludedUserEntity
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public string UserName { get; set; } = "";
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

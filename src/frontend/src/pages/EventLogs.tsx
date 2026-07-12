@@ -19,7 +19,7 @@ import type { AuthEventRow } from '../utils/authEventGrouping'
 const { RangePicker } = DatePicker
 const { Text, Paragraph } = Typography
 
-const MAX_RECORDS_OPTIONS = [200, 500, 1000, 5000]
+const MAX_RECORDS_OPTIONS = [200, 500, 1000, 5000, 10000, 50000]
 
 const LEVEL_OPTIONS = [
   { label: 'Критическая', value: 'Critical' },
@@ -201,7 +201,7 @@ function EventLogsView({ presetKey }: { presetKey?: string }) {
           />
           <Input.Search
             style={{ width: 200 }}
-            placeholder="Пользователь (часть имени)"
+            placeholder="Точное имя учётной записи"
             value={user}
             onChange={(e) => setUser(e.target.value)}
             onSearch={() => refresh()}

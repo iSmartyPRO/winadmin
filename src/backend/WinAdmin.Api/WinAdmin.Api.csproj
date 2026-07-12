@@ -20,6 +20,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>WinAdmin.Api</RootNamespace>
+    <!-- Выходной файл называется WinAdmin.exe/WinAdmin.dll (без ".Api"); неймспейсы кода не меняются. -->
+    <AssemblyName>WinAdmin</AssemblyName>
     <SpaRoot>..\..\frontend</SpaRoot>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);1591</NoWarn>

@@ -4,7 +4,7 @@
 
 1. Создайте пользователя (один раз):
    ```powershell
-   .\WinAdmin.Api.exe user add --login admin --password "<пароль>" --scopes admin
+   .\WinAdmin.exe user add --login admin --password "<пароль>" --scopes admin
    ```
 2. Войдите на странице логина логином и паролем.
 

@@ -6,6 +6,7 @@ import type {
   SystemInfo, SystemMetrics, PowerRequest, UserDto,
   CreateUserRequest, TokenResponse,
   EventLogQueryParams, EventLogQueryResult,
+  ExcludedUserDto,
 } from './types'
 
 // ── JWT storage (sessionStorage — очищается при закрытии вкладки) ──
@@ -112,6 +113,14 @@ export const api = {
     logNames: () => http.get<string[]>('/eventlogs/lognames').then((r) => r.data),
     query: (params: EventLogQueryParams) =>
       http.get<EventLogQueryResult>('/eventlogs/query', { params }).then((r) => r.data),
+  },
+
+  settings: {
+    excludedUsers: () =>
+      http.get<ExcludedUserDto[]>('/settings/excluded-users').then((r) => r.data),
+    addExcludedUser: (userName: string) =>
+      http.post<ExcludedUserDto>('/settings/excluded-users', { userName }).then((r) => r.data),
+    removeExcludedUser: (id: string) => http.delete(`/settings/excluded-users/${id}`),
   },
 }
 

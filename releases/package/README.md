@@ -1,4 +1,4 @@
-# WinAdmin v1.0.0 — быстрый запуск
+# WinAdmin v1.0.1 — быстрый запуск
 
 Self-contained пакет для **Windows Server 2019** (и новее), **x64**.  
 .NET на сервере **устанавливать не нужно** — runtime уже внутри папки.
@@ -7,7 +7,7 @@ Self-contained пакет для **Windows Server 2019** (и новее), **x64*
 
 | Файл / папка | Назначение |
 |---|---|
-| `WinAdmin.Api.exe` | Основное приложение (API + веб-интерфейс) |
+| `WinAdmin.exe` | Основное приложение (API + веб-интерфейс) |
 | `wwwroot/` | Собранный фронтенд |
 | `install-service.ps1` | Установка как службы Windows |
 | `download-release.ps1` | Скачать релиз с GitHub |
@@ -40,7 +40,7 @@ Self-contained пакет для **Windows Server 2019** (и новее), **x64*
 
 ```powershell
 cd C:\WinAdmin
-.\WinAdmin.Api.exe --urls http://0.0.0.0:8080
+.\WinAdmin.exe --urls http://0.0.0.0:8080
 ```
 
 Откройте в браузере: **http://<имя-сервера>:8080**
@@ -65,7 +65,7 @@ PowerShell, пока приложение работает):
 
 ```powershell
 cd C:\WinAdmin
-.\WinAdmin.Api.exe user add --login admin --password "ВашНадёжныйПароль" --scopes admin
+.\WinAdmin.exe user add --login admin --password "ВашНадёжныйПароль" --scopes admin
 ```
 
 Затем войдите в веб-интерфейс: логин `admin`, ваш пароль.
@@ -108,7 +108,7 @@ sc.exe delete WinAdmin
 ### Ручная установка службы (без скрипта)
 
 ```powershell
-sc.exe create WinAdmin binPath="C:\WinAdmin\WinAdmin.Api.exe --urls http://0.0.0.0:8080" start= auto
+sc.exe create WinAdmin binPath="C:\WinAdmin\WinAdmin.exe --urls http://0.0.0.0:8080" start= auto
 sc.exe start WinAdmin
 ```
 
@@ -175,9 +175,9 @@ Self-contained exe можно запускать **без IIS** — это пр�
 ## 9. CLI: управление пользователями
 
 ```powershell
-.\WinAdmin.Api.exe user add --login operator --password "..." --scopes "system.read,services.read"
-.\WinAdmin.Api.exe user list
-.\WinAdmin.Api.exe user set-password --login admin --password "новый"
+.\WinAdmin.exe user add --login operator --password "..." --scopes "system.read,services.read"
+.\WinAdmin.exe user list
+.\WinAdmin.exe user set-password --login admin --password "новый"
 ```
 
 ---

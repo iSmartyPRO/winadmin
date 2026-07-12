@@ -20,7 +20,7 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
     throw "Run PowerShell as Administrator."
 }
 
-$exe = Join-Path $InstallPath "WinAdmin.Api.exe"
+$exe = Join-Path $InstallPath "WinAdmin.exe"
 if (-not (Test-Path $exe)) { throw "Not found: $exe" }
 
 New-Item -ItemType Directory -Force -Path $DataPath | Out-Null
@@ -54,4 +54,4 @@ Write-Host "Open: http://localhost:$Port" -ForegroundColor Green
 Write-Host ""
 Write-Host "Create the first user (if none yet):" -ForegroundColor Yellow
 Write-Host "  cd `"$InstallPath`"" -ForegroundColor Yellow
-Write-Host '  .\WinAdmin.Api.exe user add --login admin --password "YourPassword" --scopes admin' -ForegroundColor Yellow
+Write-Host '  .\WinAdmin.exe user add --login admin --password "YourPassword" --scopes admin' -ForegroundColor Yellow

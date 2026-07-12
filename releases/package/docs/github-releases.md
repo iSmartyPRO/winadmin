@@ -43,7 +43,7 @@ Invoke-WebRequest "$base/install-from-github.ps1" -OutFile "$dir\install-from-gi
 
 ```powershell
 cd C:\WinAdmin
-.\WinAdmin.Api.exe user add --login admin --password "YourPassword" --scopes admin
+.\WinAdmin.exe user add --login admin --password "YourPassword" --scopes admin
 ```
 
 ---

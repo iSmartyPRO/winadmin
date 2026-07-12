@@ -53,7 +53,7 @@
 - Включите stdout-лог в `web.config` (`stdoutLogEnabled="true"`) и смотрите файл в
   `.\logs\stdout*`.
 - Проверьте, что пул в режиме **No Managed Code** и `processPath` указывает на
-  `.\WinAdmin.Api.exe`.
+  `.\WinAdmin.exe`.
 
 ## SPA не открывается (видна заглушка/404)
 

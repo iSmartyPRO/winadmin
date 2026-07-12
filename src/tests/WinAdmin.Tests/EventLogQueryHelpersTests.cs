@@ -69,6 +69,56 @@ public sealed class EventLogQueryHelpersTests
     }
 
     [Fact]
+    public void BuildXPathFilter_WithUser_ExactMatchInEventData()
+    {
+        var request = new EventLogQueryRequest
+        {
+            LogName = "Security", StartTime = Start, EndTime = End,
+            User = "gesadmin",
+        };
+
+        var xpath = EventLogQueryHelpers.BuildXPathFilter(request);
+
+        Assert.Equal(
+            "*[System[TimeCreated[@SystemTime>='2026-07-10T00:00:00.000Z' and @SystemTime<='2026-07-11T00:00:00.000Z']] and EventData[Data[@Name='TargetUserName']='gesadmin' or Data[@Name='SubjectUserName']='gesadmin' or Data[@Name='AccountName']='gesadmin']]",
+            xpath);
+    }
+
+    [Fact]
+    public void BuildXPathFilter_WithUserContainingSingleQuote_UsesDoubleQuotes()
+    {
+        var request = new EventLogQueryRequest
+        {
+            LogName = "Security", StartTime = Start, EndTime = End,
+            User = "O'Brien",
+        };
+
+        var xpath = EventLogQueryHelpers.BuildXPathFilter(request);
+
+        Assert.Contains("Data[@Name='TargetUserName']=\"O'Brien\"", xpath);
+        Assert.Contains("and EventData[", xpath);
+    }
+
+    [Fact]
+    public void BuildXPathFilter_WithUserEventIdsAndLevels()
+    {
+        var request = new EventLogQueryRequest
+        {
+            LogName = "Security", StartTime = Start, EndTime = End,
+            EventIds = new[] { 4624, 4625 },
+            Levels = new[] { "Information" },
+            User = "gesadmin",
+        };
+
+        var xpath = EventLogQueryHelpers.BuildXPathFilter(request);
+
+        Assert.Contains("(EventID=4624 or EventID=4625)", xpath);
+        Assert.Contains("(Level=4)", xpath);
+        Assert.Contains("Data[@Name='TargetUserName']='gesadmin'", xpath);
+        Assert.Contains("and EventData[", xpath);
+    }
+
+    [Fact]
     public void ExtractUserInfo_ReturnsTargetUserNameAndItsSid()
     {
         const string xml = """
@@ -218,6 +268,47 @@ public sealed class EventLogQueryHelpersTests
     public void MatchesSubstring_Cases(string? haystack, string? needle, bool expected)
     {
         Assert.Equal(expected, EventLogQueryHelpers.MatchesSubstring(haystack, needle));
+    }
+
+    private static IReadOnlySet<string> Excluded(params string[] names) =>
+        new HashSet<string>(names, StringComparer.OrdinalIgnoreCase);
+
+    [Fact]
+    public void IsExcludedUser_ExactMatch_CaseInsensitive()
+    {
+        var excluded = Excluded("svc-backup", "superadmin");
+        Assert.True(EventLogQueryHelpers.IsExcludedUser("SuperAdmin", excluded));
+        Assert.True(EventLogQueryHelpers.IsExcludedUser("svc-backup", excluded));
+    }
+
+    [Fact]
+    public void IsExcludedUser_MatchesNameAfterDomainQualifier()
+    {
+        var excluded = Excluded("superadmin");
+        Assert.True(EventLogQueryHelpers.IsExcludedUser("CORP\\superadmin", excluded));
+    }
+
+    [Fact]
+    public void IsExcludedUser_MatchesFullDomainQualifiedEntry()
+    {
+        var excluded = Excluded("CORP\\superadmin");
+        Assert.True(EventLogQueryHelpers.IsExcludedUser("CORP\\superadmin", excluded));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("ivanov")]
+    [InlineData("CORP\\ivanov")]
+    public void IsExcludedUser_ReturnsFalse_WhenNotListed(string? user)
+    {
+        Assert.False(EventLogQueryHelpers.IsExcludedUser(user, Excluded("superadmin")));
+    }
+
+    [Fact]
+    public void IsExcludedUser_ReturnsFalse_WhenExclusionSetEmpty()
+    {
+        Assert.False(EventLogQueryHelpers.IsExcludedUser("superadmin", Excluded()));
     }
 
     [Fact]

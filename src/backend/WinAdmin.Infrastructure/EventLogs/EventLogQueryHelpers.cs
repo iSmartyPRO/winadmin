@@ -11,6 +11,8 @@ public static class EventLogQueryHelpers
 {
     private static readonly XNamespace EventNs = "http://schemas.microsoft.com/win/2004/08/events/event";
 
+    private static readonly string[] UserXPathFields = ["TargetUserName", "SubjectUserName", "AccountName"];
+
     public static string BuildXPathFilter(EventLogQueryRequest request)
     {
         var conditions = new List<string>
@@ -30,7 +32,35 @@ public static class EventLogQueryHelpers
             conditions.Add($"({levels})");
         }
 
-        return $"*[System[{string.Join(" and ", conditions)}]]";
+        var systemPart = $"System[{string.Join(" and ", conditions)}]";
+        var user = NormalizeUser(request.User);
+        if (user is null)
+            return $"*[{systemPart}]";
+
+        var escaped = EscapeXPathLiteral(user);
+        var userMatch = string.Join(" or ", UserXPathFields.Select(f => $"Data[@Name='{f}']={escaped}"));
+        return $"*[{systemPart} and EventData[{userMatch}]]";
+    }
+
+    /// <summary>Trim; пустая строка → null (фильтр по пользователю не применяется).</summary>
+    private static string? NormalizeUser(string? user)
+    {
+        var trimmed = user?.Trim();
+        return string.IsNullOrEmpty(trimmed) ? null : trimmed;
+    }
+
+    /// <summary>Экранирует литерал для XPath: XML-сущности и выбор кавычек.</summary>
+    private static string EscapeXPathLiteral(string value)
+    {
+        var escaped = value
+            .Replace("&", "&amp;", StringComparison.Ordinal)
+            .Replace("<", "&lt;", StringComparison.Ordinal)
+            .Replace(">", "&gt;", StringComparison.Ordinal);
+
+        if (escaped.Contains('\''))
+            return $"\"{escaped.Replace("\"", "&quot;", StringComparison.Ordinal)}\"";
+
+        return $"'{escaped}'";
     }
 
     public static string FormatXPathTime(DateTime dt) =>
@@ -123,6 +153,22 @@ public static class EventLogQueryHelpers
     {
         if (sid is SidSystem or SidLocalService or SidNetworkService) return true;
         return name is not null && name.EndsWith('$');
+    }
+
+    /// <summary>
+    /// Проверяет, входит ли учётная запись события в чёрный список (регистронезависимо).
+    /// Сравнивает как полное извлечённое имя (например «DOMAIN\svc» или «svc»), так и часть
+    /// после последнего «\», чтобы имя из настроек совпадало и с доменно-квалифицированным
+    /// вариантом. Ожидается, что <paramref name="excluded"/> создан с
+    /// StringComparer.OrdinalIgnoreCase.
+    /// </summary>
+    public static bool IsExcludedUser(string? user, IReadOnlySet<string> excluded)
+    {
+        if (string.IsNullOrEmpty(user) || excluded.Count == 0) return false;
+        if (excluded.Contains(user)) return true;
+
+        var slash = user.LastIndexOf('\\');
+        return slash >= 0 && slash < user.Length - 1 && excluded.Contains(user[(slash + 1)..]);
     }
 
     public static bool MatchesSubstring(string? haystack, string? needle) =>

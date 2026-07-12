@@ -3,7 +3,7 @@ import {
   DashboardOutlined, HddOutlined, ApiOutlined, AppstoreOutlined,
   PrinterOutlined, PoweroffOutlined, KeyOutlined, FileSearchOutlined,
   BookOutlined, LogoutOutlined, DesktopOutlined, TeamOutlined,
-  FileTextOutlined,
+  FileTextOutlined, SettingOutlined,
 } from '@ant-design/icons'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
@@ -43,6 +43,7 @@ export default function AppLayout({ machine }: { machine?: string; onLogout: () 
     ...(isAdmin ? [{ key: '/cp/users', icon: <TeamOutlined />, label: 'Пользователи' }] : []),
     { key: '/cp/apikeys', icon: <KeyOutlined />, label: 'API-ключи' },
     { key: '/cp/audit', icon: <FileSearchOutlined />, label: 'Аудит' },
+    ...(isAdmin ? [{ key: '/cp/settings', icon: <SettingOutlined />, label: 'Настройки' }] : []),
     { key: '/docs', icon: <BookOutlined />, label: 'API-документация' },
   ]
 

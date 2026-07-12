@@ -11,7 +11,7 @@ namespace WinAdmin.Infrastructure.EventLogs;
 [SupportedOSPlatform("windows")]
 public sealed class EventLogService : IEventLogService
 {
-    private const int ScanCap = 5000;
+    private const int ScanCap = 100_000;
     private readonly ILogger<EventLogService> _logger;
 
     public EventLogService(ILogger<EventLogService> logger) => _logger = logger;
@@ -36,6 +36,10 @@ public sealed class EventLogService : IEventLogService
         var entries = new List<EventLogEntryDto>();
         var scanned = 0;
         var truncated = false;
+
+        var excludedUsers = request.ExcludeUserNames is { Count: > 0 }
+            ? new HashSet<string>(request.ExcludeUserNames, StringComparer.OrdinalIgnoreCase)
+            : null;
 
         try
         {
@@ -80,7 +84,7 @@ public sealed class EventLogService : IEventLogService
                     if (request.ExcludeSystemAccounts && EventLogQueryHelpers.IsSystemAccount(sid, user))
                         continue;
 
-                    if (!EventLogQueryHelpers.MatchesSubstring(user, request.User))
+                    if (excludedUsers != null && EventLogQueryHelpers.IsExcludedUser(user, excludedUsers))
                         continue;
 
                     entries.Add(new EventLogEntryDto

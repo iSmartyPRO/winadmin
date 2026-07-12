@@ -36,6 +36,6 @@ if (-not (Test-Path $installScript)) { throw "Not found: $installScript" }
 Write-Host ""
 Write-Host 'Create the first user (if none yet):' -ForegroundColor Yellow
 Write-Host "  cd `"$InstallPath`"" -ForegroundColor Yellow
-Write-Host '  .\WinAdmin.Api.exe user add --login admin --password "YourPassword" --scopes admin' -ForegroundColor Yellow
+Write-Host '  .\WinAdmin.exe user add --login admin --password "YourPassword" --scopes admin' -ForegroundColor Yellow
 Write-Host ""
 Write-Host "Open: http://localhost:$Port" -ForegroundColor Green

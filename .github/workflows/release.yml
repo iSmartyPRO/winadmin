@@ -9,7 +9,7 @@ on:
       version:
         description: 'Version label for manual build (e.g. 1.0.1)'
         required: true
-        default: '1.0.0'
+        default: '1.0.1'
 
 permissions:
   contents: write
@@ -85,7 +85,7 @@ jobs:
                ```powershell
                cd C:\WinAdmin
                .\install-service.ps1 -Port 8080
-               .\WinAdmin.Api.exe user add --login admin --password "YourPassword" --scopes admin
+               .\WinAdmin.exe user add --login admin --password "YourPassword" --scopes admin
                ```
             3. Откройте http://localhost:8080
 

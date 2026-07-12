@@ -155,7 +155,7 @@ builder.Services.AddSwaggerGen(c =>
     {
         [new OpenApiSecuritySchemeReference(ApiKeyDefaults.Scheme, doc)] = [],
     });
-    var xml = Path.Combine(AppContext.BaseDirectory, "WinAdmin.Api.xml");
+    var xml = Path.Combine(AppContext.BaseDirectory, "WinAdmin.xml");
     if (File.Exists(xml)) c.IncludeXmlComments(xml);
 });
 
@@ -182,7 +182,7 @@ using (var scope = app.Services.CreateScope())
     {
         app.Logger.LogWarning("════════════════════════════════════════════════════");
         app.Logger.LogWarning("Пользователи не созданы. Создайте первого пользователя:");
-        app.Logger.LogWarning("WinAdmin.Api.exe user add --login admin --password <пароль> --scopes admin");
+        app.Logger.LogWarning("WinAdmin.exe user add --login admin --password <пароль> --scopes admin");
         app.Logger.LogWarning("════════════════════════════════════════════════════");
     }
 }

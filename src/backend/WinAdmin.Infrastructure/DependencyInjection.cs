@@ -9,6 +9,7 @@ using WinAdmin.Infrastructure.Printers;
 using WinAdmin.Infrastructure.Processes;
 using WinAdmin.Infrastructure.Security;
 using WinAdmin.Infrastructure.Services;
+using WinAdmin.Infrastructure.Settings;
 using WinAdmin.Infrastructure.Storage;
 using WinAdmin.Infrastructure.MachineInfo;
 
@@ -40,6 +41,7 @@ public static class DependencyInjection
         services.AddScoped<IAuditService, AuditService>();
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<ITokenService, TokenService>();
+        services.AddScoped<IExcludedUserService, ExcludedUserService>();
 
         return services;
     }

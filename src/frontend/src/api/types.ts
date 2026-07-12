@@ -184,3 +184,9 @@ export interface EventLogQueryResult {
   truncated: boolean
   scannedCount: number
 }
+
+export interface ExcludedUserDto {
+  id: string
+  userName: string
+  createdAt: string
+}

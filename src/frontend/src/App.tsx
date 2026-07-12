@@ -14,6 +14,7 @@ import ApiKeys from './pages/ApiKeys'
 import AuditLog from './pages/AuditLog'
 import ApiDocs from './pages/ApiDocs'
 import Users from './pages/Users'
+import Settings from './pages/Settings'
 import EventLogs from './pages/EventLogs'
 
 export default function App() {
@@ -46,6 +47,7 @@ export default function App() {
           <Route path="/cp/apikeys" element={<ApiKeys />} />
           <Route path="/cp/audit" element={<AuditLog />} />
           <Route path="/cp/users" element={<Users />} />
+          <Route path="/cp/settings" element={<Settings />} />
           <Route path="/docs" element={<ApiDocs />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

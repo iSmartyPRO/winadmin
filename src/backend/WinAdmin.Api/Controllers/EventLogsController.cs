@@ -11,8 +11,13 @@ namespace WinAdmin.Api.Controllers;
 public sealed class EventLogsController : WinAdminControllerBase
 {
     private readonly IEventLogService _eventLogs;
+    private readonly IExcludedUserService _excludedUsers;
 
-    public EventLogsController(IEventLogService eventLogs) => _eventLogs = eventLogs;
+    public EventLogsController(IEventLogService eventLogs, IExcludedUserService excludedUsers)
+    {
+        _eventLogs = eventLogs;
+        _excludedUsers = excludedUsers;
+    }
 
     /// <summary>Список всех журналов событий, доступных на этой машине.</summary>
     [HttpGet("lognames")]
@@ -27,10 +32,11 @@ public sealed class EventLogsController : WinAdminControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public ActionResult<EventLogQueryResult> Query(
+    public async Task<ActionResult<EventLogQueryResult>> Query(
         [FromQuery] string logName,
         [FromQuery] DateTime start,
         [FromQuery] DateTime end,
+        CancellationToken ct,
         [FromQuery] int maxRecords = 200,
         [FromQuery] string? eventIds = null,
         [FromQuery] string? levels = null,
@@ -49,13 +55,14 @@ public sealed class EventLogsController : WinAdminControllerBase
             LogName = logName,
             StartTime = start,
             EndTime = end,
-            MaxRecords = Math.Clamp(maxRecords, 1, 5000),
+            MaxRecords = Math.Clamp(maxRecords, 1, 50000),
             EventIds = EventLogQueryHelpers.ParseIntList(eventIds),
             Levels = EventLogQueryHelpers.ParseStringList(levels),
             Keyword = keyword,
             User = user,
             ExcludeSystemAccounts = excludeSystemAccounts,
             ExcludeLogonTypes = EventLogQueryHelpers.ParseIntList(excludeLogonTypes),
+            ExcludeUserNames = await _excludedUsers.ListNamesAsync(ct),
         };
 
         try

@@ -73,7 +73,7 @@ Invoke-WebRequest "$base/install-from-github.ps1" -OutFile "$dir\install-from-gi
 
 ```powershell
 cd C:\WinAdmin
-.\WinAdmin.Api.exe user add --login admin --password "YourPassword" --scopes admin
+.\WinAdmin.exe user add --login admin --password "YourPassword" --scopes admin
 ```
 
 ### Обновление
@@ -107,10 +107,10 @@ git push origin v1.0.1
 
 ```powershell
 # Напрямую — нулевые зависимости
-.\WinAdmin.Api.exe --urls http://localhost:8080
+.\WinAdmin.exe --urls http://localhost:8080
 
 # Как Windows Service
-sc.exe create WinAdmin binPath="C:\WinAdmin\WinAdmin.Api.exe --urls http://localhost:8080"
+sc.exe create WinAdmin binPath="C:\WinAdmin\WinAdmin.exe --urls http://localhost:8080"
 sc.exe start WinAdmin
 ```
 
