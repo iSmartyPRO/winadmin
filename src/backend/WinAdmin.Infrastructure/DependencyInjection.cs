@@ -38,6 +38,8 @@ public static class DependencyInjection
         services.AddScoped<IPowerService, PowerService>();
         services.AddScoped<IEventLogService, EventLogService>();
         services.AddScoped<ISoftwareCatalogService, SoftwareCatalogService>();
+        services.AddSingleton<ISoftwareProcessRunner, SoftwareProcessRunner>();
+        services.AddSingleton<ISoftwareJobService, SoftwareJobService>();
 
         services.AddScoped<IApiKeyService, ApiKeyService>();
         services.AddScoped<IAuditService, AuditService>();
