@@ -53,8 +53,9 @@
 - `software.read` — списки applications/updates
 - `software.manage` — uninstall / rollback и чтение статуса jobs
 
-`admin` по-прежнему включает все scopes (существующее поведение, если так заведено
-для других manage-scopes — следовать тому же правилу в валидации/выдаче).
+`admin` проходит любую scope-policy (см. `ScopeAuthorization`) — отдельно
+включать `software.*` в admin не нужно; достаточно добавить scopes в `Scopes.All`
+для валидации ключей/пользователей.
 
 ## Бэкенд
 
