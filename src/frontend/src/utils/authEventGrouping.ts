@@ -14,6 +14,7 @@ export interface AuthEventGroup {
   entries: EventLogEntryDto[]
   timeCreated: string
   user?: string
+  ipAddress?: string
   summary: AuthEventGroupSummary
 }
 
@@ -40,6 +41,8 @@ function toRow(run: EventLogEntryDto[]): AuthEventRow {
     entries: run,
     timeCreated: run[0].timeCreated,
     user: run[0].user,
+    // В группе IP есть не у всех событий (напр. 4672 без сети) — берём первый непустой.
+    ipAddress: run.find((e) => e.ipAddress)?.ipAddress,
     summary: summarize(run),
   }
 }

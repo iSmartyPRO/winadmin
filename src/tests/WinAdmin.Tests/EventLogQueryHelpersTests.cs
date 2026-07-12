@@ -242,6 +242,61 @@ public sealed class EventLogQueryHelpersTests
         Assert.Null(EventLogQueryHelpers.ExtractLogonType("<Event><Unclosed>"));
     }
 
+    [Fact]
+    public void ExtractIpAddress_ReturnsValue()
+    {
+        const string xml = """
+            <Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'>
+              <System><EventID>4624</EventID></System>
+              <EventData>
+                <Data Name='TargetUserName'>Maxim.Voinov</Data>
+                <Data Name='IpAddress'>192.168.9.68</Data>
+              </EventData>
+            </Event>
+            """;
+
+        Assert.Equal("192.168.9.68", EventLogQueryHelpers.ExtractIpAddress(xml));
+    }
+
+    [Theory]
+    [InlineData("-")]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void ExtractIpAddress_ReturnsNull_ForEmptyOrDash(string ip)
+    {
+        var xml = $"""
+            <Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'>
+              <System><EventID>4624</EventID></System>
+              <EventData>
+                <Data Name='IpAddress'>{ip}</Data>
+              </EventData>
+            </Event>
+            """;
+
+        Assert.Null(EventLogQueryHelpers.ExtractIpAddress(xml));
+    }
+
+    [Fact]
+    public void ExtractIpAddress_ReturnsNull_WhenFieldMissing()
+    {
+        const string xml = """
+            <Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'>
+              <System><EventID>4672</EventID></System>
+              <EventData>
+                <Data Name='SubjectUserName'>SYSTEM</Data>
+              </EventData>
+            </Event>
+            """;
+
+        Assert.Null(EventLogQueryHelpers.ExtractIpAddress(xml));
+    }
+
+    [Fact]
+    public void ExtractIpAddress_ReturnsNull_OnMalformedXml()
+    {
+        Assert.Null(EventLogQueryHelpers.ExtractIpAddress("<Event><Unclosed>"));
+    }
+
     [Theory]
     [InlineData("S-1-5-18", "SYSTEM", true)]
     [InlineData("S-1-5-18", "СИСТЕМА", true)]

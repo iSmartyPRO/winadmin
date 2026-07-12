@@ -8,7 +8,18 @@ const { version } = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 
 // SPA собирается прямо в wwwroot бэкенда — NestJS-аналог: ASP.NET Core отдаёт статику.
 // В dev — проксируем API/Swagger на Kestrel (порт 5099).
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    {
+      name: 'html-title-version',
+      transformIndexHtml(html) {
+        return html.replace(
+          /<title>.*?<\/title>/,
+          `<title>WinAdmin v${version} — управление машиной</title>`,
+        )
+      },
+    },
+  ],
   define: {
     __APP_VERSION__: JSON.stringify(version),
   },

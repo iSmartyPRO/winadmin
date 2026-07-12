@@ -13,6 +13,12 @@ public sealed record EventLogEntryDto
     public string? User { get; init; }
     public string? Message { get; init; }
     public string? MachineName { get; init; }
+
+    /// <summary>
+    /// IP-адрес источника входа (поле IpAddress в EventData событий 4624/4625 и т.п.).
+    /// null, если события без сетевого источника или локальный вход ("-").
+    /// </summary>
+    public string? IpAddress { get; init; }
 }
 
 /// <summary>Параметры запроса журнала событий.</summary>

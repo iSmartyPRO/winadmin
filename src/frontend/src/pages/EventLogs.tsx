@@ -2,8 +2,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import {
-  Alert, Button, Card, DatePicker, Input, Modal, Select, Space, Switch, Table, Tag, Typography,
+  Alert, Button, Card, DatePicker, Input, Modal, Select, Space, Switch, Table, Tag, Tooltip, Typography,
 } from 'antd'
+import { InfoCircleOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
@@ -58,6 +59,8 @@ function EventLogsView({ presetKey }: { presetKey?: string }) {
   const [keyword, setKeyword] = useState('')
   const [user, setUser] = useState('')
   const [excludeSystem, setExcludeSystem] = useState(true)
+  const [hideNoise, setHideNoise] = useState(true)
+  const [detailed, setDetailed] = useState(false)
   const [detail, setDetail] = useState<EventLogEntryDto | null>(null)
 
   useEffect(() => {
@@ -78,8 +81,8 @@ function EventLogsView({ presetKey }: { presetKey?: string }) {
       keyword: keyword || undefined,
       user: user || undefined,
       excludeSystemAccounts: isAuthPreset ? excludeSystem : undefined,
-      // В пресете «Авторизация» скрываем фоновый шум: служебные (5) и сетевые (3) входы.
-      excludeLogonTypes: isAuthPreset ? '3,5' : undefined,
+      // Скрываем фоновый шум (сетевые 3, служебные 5), кроме поиска по конкретному пользователю.
+      excludeLogonTypes: isAuthPreset && hideNoise && !user.trim() ? '3,5' : undefined,
     })
   })
 
@@ -105,45 +108,78 @@ function EventLogsView({ presetKey }: { presetKey?: string }) {
     if (isAuthPreset) refresh()
   }, [excludeSystem]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const isFirstRenderHideNoise = useRef(true)
+  useEffect(() => {
+    if (isFirstRenderHideNoise.current) {
+      isFirstRenderHideNoise.current = false
+      return
+    }
+    if (isAuthPreset) refresh()
+  }, [hideNoise]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const tableData: AuthEventRow[] = isAuthPreset
     ? groupAuthEvents(data?.entries ?? [])
     : (data?.entries ?? [])
 
-  const columns: ColumnsType<AuthEventRow> = [
-    {
-      title: 'Время', dataIndex: 'timeCreated', width: 180,
-      render: (d: string) => formatDateTime(d),
+  const timeCol: ColumnsType<AuthEventRow>[number] = {
+    title: 'Время', dataIndex: 'timeCreated', width: 180,
+    render: (d: string) => formatDateTime(d),
+  }
+  const levelCol: ColumnsType<AuthEventRow>[number] = {
+    title: isAuthPreset ? 'Событие' : 'Уровень', dataIndex: 'levelDisplayName', width: 150,
+    render: (l: string | undefined, r: AuthEventRow) => {
+      if (isAuthEventGroup(r)) return <Tag color={r.summary.color}>{r.summary.label}</Tag>
+      return <Tag color={LEVEL_COLORS[r.level ?? ''] ?? 'default'}>{l ?? r.level ?? '—'}</Tag>
     },
-    {
-      title: 'Уровень', dataIndex: 'levelDisplayName', width: 130,
-      render: (l: string | undefined, r: AuthEventRow) => {
-        if (isAuthEventGroup(r)) return <Tag color={r.summary.color}>{r.summary.label}</Tag>
-        return <Tag color={LEVEL_COLORS[r.level ?? ''] ?? 'default'}>{l ?? r.level ?? '—'}</Tag>
-      },
+  }
+  const sourceCol: ColumnsType<AuthEventRow>[number] = {
+    title: 'Источник', dataIndex: 'providerName', width: 220, ellipsis: true,
+    render: (v: string | undefined, r: AuthEventRow) => {
+      if (isAuthEventGroup(r)) return <Text type="secondary">—</Text>
+      return v ?? <Text type="secondary">—</Text>
     },
-    {
-      title: 'Источник', dataIndex: 'providerName', width: 220, ellipsis: true,
-      render: (v: string | undefined, r: AuthEventRow) => {
-        if (isAuthEventGroup(r)) return <Text type="secondary">—</Text>
-        return v ?? <Text type="secondary">—</Text>
-      },
+  }
+  const eventIdCol: ColumnsType<AuthEventRow>[number] = {
+    title: 'ID события', dataIndex: 'eventId', width: 100,
+    render: (v: number | undefined, r: AuthEventRow) => (isAuthEventGroup(r) ? `${r.entries.length} событий` : v),
+  }
+  const userCol: ColumnsType<AuthEventRow>[number] = {
+    title: 'Пользователь', dataIndex: 'user', width: 160,
+    render: (u?: string) => u ?? <Text type="secondary">—</Text>,
+  }
+  const ipCol: ColumnsType<AuthEventRow>[number] = {
+    title: 'IP-адрес', dataIndex: 'ipAddress', width: 150,
+    render: (ip?: string) => (ip ? <Text>{ip}</Text> : <Text type="secondary">—</Text>),
+  }
+  const messageCol: ColumnsType<AuthEventRow>[number] = {
+    title: 'Сообщение', dataIndex: 'message', ellipsis: true,
+    render: (m: string | undefined, r: AuthEventRow) => {
+      if (isAuthEventGroup(r)) return <Text type="secondary">—</Text>
+      return m ?? <Text type="secondary">—</Text>
     },
-    {
-      title: 'ID события', dataIndex: 'eventId', width: 100,
-      render: (v: number | undefined, r: AuthEventRow) => (isAuthEventGroup(r) ? `${r.entries.length} событий` : v),
+  }
+  const detailsCol: ColumnsType<AuthEventRow>[number] = {
+    title: 'Детали', key: 'details', width: 80, align: 'center',
+    render: (_: unknown, r: AuthEventRow) => {
+      if (isAuthEventGroup(r)) return <Text type="secondary">—</Text>
+      return (
+        <Tooltip title="Подробно о событии">
+          <Button
+            type="text"
+            size="small"
+            icon={<InfoCircleOutlined />}
+            onClick={(e) => { e.stopPropagation(); setDetail(r) }}
+          />
+        </Tooltip>
+      )
     },
-    {
-      title: 'Пользователь', dataIndex: 'user', width: 160,
-      render: (u?: string) => u ?? <Text type="secondary">—</Text>,
-    },
-    {
-      title: 'Сообщение', dataIndex: 'message', ellipsis: true,
-      render: (m: string | undefined, r: AuthEventRow) => {
-        if (isAuthEventGroup(r)) return <Text type="secondary">—</Text>
-        return m ?? <Text type="secondary">—</Text>
-      },
-    },
-  ]
+  }
+
+  const columns: ColumnsType<AuthEventRow> = isAuthPreset
+    ? (detailed
+        ? [timeCol, levelCol, sourceCol, eventIdCol, userCol, ipCol, messageCol, detailsCol]
+        : [timeCol, levelCol, userCol, ipCol, detailsCol])
+    : [timeCol, levelCol, sourceCol, eventIdCol, userCol, messageCol, detailsCol]
 
   return (
     <>
@@ -214,6 +250,23 @@ function EventLogsView({ presetKey }: { presetKey?: string }) {
               unCheckedChildren="Все записи"
             />
           )}
+          {isAuthPreset && (
+            <Switch
+              checked={hideNoise}
+              onChange={setHideNoise}
+              checkedChildren="Без сетевых/служебных"
+              unCheckedChildren="Все типы входа"
+              disabled={!!user.trim()}
+            />
+          )}
+          {isAuthPreset && (
+            <Switch
+              checked={detailed}
+              onChange={setDetailed}
+              checkedChildren="Подробно"
+              unCheckedChildren="Кратко"
+            />
+          )}
           <Button type="primary" onClick={() => refresh()} loading={loading}>Применить</Button>
         </Space>
       </Card>
@@ -264,6 +317,14 @@ function EventLogsView({ presetKey }: { presetKey?: string }) {
                     },
                     { dataIndex: 'eventId', width: 100 },
                     {
+                      dataIndex: 'user', width: 160,
+                      render: (u?: string) => u ?? <Text type="secondary">—</Text>,
+                    },
+                    {
+                      dataIndex: 'ipAddress', width: 150,
+                      render: (ip?: string) => (ip ? <Text>{ip}</Text> : <Text type="secondary">—</Text>),
+                    },
+                    {
                       dataIndex: 'message', ellipsis: true,
                       render: (m?: string) => m ?? <Text type="secondary">—</Text>,
                     },
@@ -288,6 +349,7 @@ function EventLogsView({ presetKey }: { presetKey?: string }) {
             <Paragraph><Text strong>Журнал:</Text> {detail.logName}</Paragraph>
             <Paragraph><Text strong>Уровень:</Text> {detail.levelDisplayName ?? detail.level ?? '—'}</Paragraph>
             <Paragraph><Text strong>Пользователь:</Text> {detail.user ?? '—'}</Paragraph>
+            <Paragraph><Text strong>IP-адрес:</Text> {detail.ipAddress ?? '—'}</Paragraph>
             <Paragraph><Text strong>Машина:</Text> {detail.machineName ?? '—'}</Paragraph>
             <Paragraph style={{ whiteSpace: 'pre-wrap' }}>{detail.message ?? '—'}</Paragraph>
           </>

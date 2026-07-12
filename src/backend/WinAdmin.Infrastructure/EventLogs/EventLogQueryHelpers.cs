@@ -143,6 +143,29 @@ public static class EventLogQueryHelpers
     }
 
     /// <summary>
+    /// Извлекает IP-адрес источника входа из EventData (поле IpAddress). Возвращает null,
+    /// если поля нет, оно пустое или "-" (локальный вход без сетевого источника).
+    /// </summary>
+    public static string? ExtractIpAddress(string recordXml)
+    {
+        XDocument doc;
+        try
+        {
+            doc = XDocument.Parse(recordXml);
+        }
+        catch (System.Xml.XmlException)
+        {
+            return null;
+        }
+
+        var value = doc.Descendants(EventNs + "Data")
+            .FirstOrDefault(d => (string?)d.Attribute("Name") == "IpAddress")?.Value;
+
+        var trimmed = value?.Trim();
+        return string.IsNullOrEmpty(trimmed) || trimmed == "-" ? null : trimmed;
+    }
+
+    /// <summary>
     /// Определяет встроенную системную учётную запись по SID (языконезависимо — SID не
     /// переводится): SYSTEM/LOCAL SERVICE/NETWORK SERVICE, либо по суффиксу "$" в имени
     /// (машинный аккаунт — соглашение именования NetBIOS, тоже не зависит от языка). Если SID

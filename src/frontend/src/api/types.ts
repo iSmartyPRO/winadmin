@@ -164,6 +164,7 @@ export interface EventLogEntryDto {
   user?: string
   message?: string
   machineName?: string
+  ipAddress?: string
 }
 
 export interface EventLogQueryParams {

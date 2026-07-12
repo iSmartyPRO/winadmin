@@ -99,6 +99,7 @@ public sealed class EventLogService : IEventLogService
                         User = user,
                         Message = message,
                         MachineName = record.MachineName,
+                        IpAddress = xml != null ? EventLogQueryHelpers.ExtractIpAddress(xml) : null,
                     });
 
                     if (entries.Count >= request.MaxRecords)
