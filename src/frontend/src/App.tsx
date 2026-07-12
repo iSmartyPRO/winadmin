@@ -14,6 +14,7 @@ import ApiKeys from './pages/ApiKeys'
 import AuditLog from './pages/AuditLog'
 import ApiDocs from './pages/ApiDocs'
 import Users from './pages/Users'
+import EventLogs from './pages/EventLogs'
 
 export default function App() {
   const [authed, setAuthed] = useState(() => Boolean(getStoredToken()))
@@ -41,6 +42,7 @@ export default function App() {
           <Route path="/processes" element={<Processes />} />
           <Route path="/printers" element={<Printers />} />
           <Route path="/power" element={<Power />} />
+          <Route path="/logs/:presetKey" element={<EventLogs />} />
           <Route path="/cp/apikeys" element={<ApiKeys />} />
           <Route path="/cp/audit" element={<AuditLog />} />
           <Route path="/cp/users" element={<Users />} />

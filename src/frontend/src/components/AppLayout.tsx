@@ -3,6 +3,7 @@ import {
   DashboardOutlined, HddOutlined, ApiOutlined, AppstoreOutlined,
   PrinterOutlined, PoweroffOutlined, KeyOutlined, FileSearchOutlined,
   BookOutlined, LogoutOutlined, DesktopOutlined, TeamOutlined,
+  FileTextOutlined,
 } from '@ant-design/icons'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
@@ -25,6 +26,19 @@ export default function AppLayout({ machine }: { machine?: string; onLogout: () 
     { key: '/processes', icon: <AppstoreOutlined />, label: 'Процессы' },
     { key: '/printers', icon: <PrinterOutlined />, label: 'Принтеры' },
     { key: '/power', icon: <PoweroffOutlined />, label: 'Питание' },
+    {
+      key: '/logs', icon: <FileTextOutlined />, label: 'Журналы Windows',
+      children: [
+        { key: '/logs/auth', label: 'Авторизация' },
+        { key: '/logs/security', label: 'Security (все события)' },
+        { key: '/logs/system', label: 'Система' },
+        { key: '/logs/application', label: 'Приложения' },
+        { key: '/logs/powershell', label: 'PowerShell' },
+        { key: '/logs/setup', label: 'Установка ПО' },
+        { type: 'divider' as const },
+        { key: '/logs/custom', label: 'Произвольный журнал' },
+      ],
+    },
     { type: 'divider' as const },
     ...(isAdmin ? [{ key: '/cp/users', icon: <TeamOutlined />, label: 'Пользователи' }] : []),
     { key: '/cp/apikeys', icon: <KeyOutlined />, label: 'API-ключи' },
@@ -49,6 +63,7 @@ export default function AppLayout({ machine }: { machine?: string; onLogout: () 
           theme="dark"
           mode="inline"
           selectedKeys={[location.pathname]}
+          defaultOpenKeys={['/logs']}
           items={items}
           onClick={({ key }) => navigate(key)}
           style={{ background: 'transparent', borderInlineEnd: 'none' }}
