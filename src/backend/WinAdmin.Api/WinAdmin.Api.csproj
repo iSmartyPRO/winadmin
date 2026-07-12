@@ -22,6 +22,7 @@
     <RootNamespace>WinAdmin.Api</RootNamespace>
     <!-- Выходной файл называется WinAdmin.exe/WinAdmin.dll (без ".Api"); неймспейсы кода не меняются. -->
     <AssemblyName>WinAdmin</AssemblyName>
+    <ApplicationIcon>..\..\..\app.ico</ApplicationIcon>
     <SpaRoot>..\..\frontend</SpaRoot>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);1591</NoWarn>

@@ -57,7 +57,7 @@ export default function AppLayout({ machine }: { machine?: string; onLogout: () 
         style={{ borderRight: '1px solid #1b212c', position: 'sticky', top: 0, height: '100vh' }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: collapsed ? '18px 0' : '18px 20px', justifyContent: collapsed ? 'center' : 'flex-start' }}>
-          <DesktopOutlined style={{ fontSize: 22, color: '#4f7cff' }} />
+          <img src="/favicon.svg" alt="" width={22} height={22} />
           {!collapsed && <Text strong style={{ fontSize: 18, letterSpacing: 0.3 }}>WinAdmin</Text>}
         </div>
         <Menu

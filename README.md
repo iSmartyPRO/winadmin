@@ -83,6 +83,11 @@ cd C:\apps\WinAdmin
 .\update-release.ps1 -Port 8080
 ```
 
+### WinAdmin.Ctl (GUI-утилита)
+
+Автономный `WinAdmin.Ctl.exe` (нативный, ~2 МБ, без зависимостей) — установка, обновление,
+управление службой и пользователями через окно. Сборка и инструкция: [releases/ctl/README.md](releases/ctl/README.md).
+
 ### Публикация нового релиза (разработчик)
 
 ```powershell

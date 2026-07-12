@@ -1,6 +1,6 @@
 ﻿import { useState } from 'react'
 import { Button, Card, Form, Input, Typography, App } from 'antd'
-import { KeyOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
+import { KeyOutlined } from '@ant-design/icons'
 import { api, setStoredKey } from '../api/client'
 
 const { Title, Paragraph } = Typography
@@ -34,7 +34,7 @@ export default function KeyGate({ onAuthed }: { onAuthed: () => void }) {
     <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24 }}>
       <Card className="sp-glass sp-fade-in" style={{ width: 420, maxWidth: '100%' }} variant="borderless">
         <div style={{ textAlign: 'center', marginBottom: 12 }}>
-          <SafetyCertificateOutlined style={{ fontSize: 42, color: '#4f7cff' }} />
+          <img src="/favicon.svg" alt="" width={42} height={42} />
           <Title level={3} style={{ marginTop: 12, marginBottom: 0 }}>WinAdmin</Title>
           <Paragraph type="secondary" style={{ marginTop: 6 }}>
             Управление и мониторинг Windows-машины
