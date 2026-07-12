@@ -13,7 +13,9 @@ const ALL_SCOPES = [
   'services.read', 'services.manage',
   'processes.read', 'processes.manage',
   'printers.read', 'printers.manage',
-  'power.manage', 'admin',
+  'power.manage', 'eventlogs.read',
+  'software.read', 'software.manage',
+  'admin',
 ]
 
 export default function Users() {

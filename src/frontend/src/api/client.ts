@@ -7,6 +7,7 @@ import type {
   CreateUserRequest, TokenResponse,
   EventLogQueryParams, EventLogQueryResult,
   ExcludedUserDto,
+  InstalledApp, InstalledUpdate, SoftwareJob,
 } from './types'
 
 // ── JWT storage (sessionStorage — очищается при закрытии вкладки) ──
@@ -121,6 +122,20 @@ export const api = {
     addExcludedUser: (userName: string) =>
       http.post<ExcludedUserDto>('/settings/excluded-users', { userName }).then((r) => r.data),
     removeExcludedUser: (id: string) => http.delete(`/settings/excluded-users/${id}`),
+  },
+
+  software: {
+    applications: () => http.get<InstalledApp[]>('/software/applications').then((r) => r.data),
+    uninstallApp: (id: string) =>
+      http.post<SoftwareJob>(`/software/applications/${encodeURIComponent(id)}/uninstall`).then((r) => r.data),
+    updates: () => http.get<InstalledUpdate[]>('/software/updates').then((r) => r.data),
+    uninstallUpdate: (id: string) =>
+      http.post<SoftwareJob>(`/software/updates/${encodeURIComponent(id)}/uninstall`).then((r) => r.data),
+    rollbackUpdate: (id: string) =>
+      http.post<SoftwareJob>(`/software/updates/${encodeURIComponent(id)}/rollback`).then((r) => r.data),
+    getJob: (jobId: string) => http.get<SoftwareJob>(`/software/jobs/${jobId}`).then((r) => r.data),
+    getActiveJob: () =>
+      http.get<SoftwareJob>('/software/jobs/active').then((r) => (r.status === 204 ? null : r.data)),
   },
 }
 

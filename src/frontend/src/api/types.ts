@@ -191,3 +191,43 @@ export interface ExcludedUserDto {
   userName: string
   createdAt: string
 }
+
+export type SoftwareJobType = 'UninstallApp' | 'UninstallUpdate' | 'RollbackUpdate'
+export type SoftwareJobStatus = 'Queued' | 'Running' | 'Succeeded' | 'Failed'
+
+export interface InstalledApp {
+  id: string
+  name: string
+  version?: string
+  publisher?: string
+  installDate?: string
+  installLocation?: string
+  sizeBytes?: number
+  source: 'Registry' | 'Store' | string
+  isSystem: boolean
+  canUninstall: boolean
+  uninstallString?: string
+}
+
+export interface InstalledUpdate {
+  id: string
+  kbArticle?: string
+  title: string
+  description?: string
+  installedOn?: string
+  canUninstall: boolean
+  canRollback: boolean
+}
+
+export interface SoftwareJob {
+  id: string
+  type: SoftwareJobType
+  targetId: string
+  targetName: string
+  status: SoftwareJobStatus
+  progressPercent?: number | null
+  statusMessage: string
+  error?: string
+  startedAt: string
+  finishedAt?: string
+}
