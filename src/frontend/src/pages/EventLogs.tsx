@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import {
-  Alert, Button, Card, DatePicker, Input, Modal, Select, Space, Table, Tag, Typography,
+  Alert, Button, Card, DatePicker, Input, Modal, Select, Space, Switch, Table, Tag, Typography,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
@@ -44,6 +44,7 @@ export default function EventLogs() {
 
 function EventLogsView({ presetKey }: { presetKey?: string }) {
   const isCustom = presetKey === 'custom'
+  const isAuthPreset = presetKey === 'auth'
   const preset = findPreset(presetKey)
 
   const [logName, setLogName] = useState(preset?.logName ?? '')
@@ -54,6 +55,7 @@ function EventLogsView({ presetKey }: { presetKey?: string }) {
   const [eventIds, setEventIds] = useState(preset?.eventIds?.join(',') ?? '')
   const [keyword, setKeyword] = useState('')
   const [user, setUser] = useState('')
+  const [excludeSystem, setExcludeSystem] = useState(true)
   const [detail, setDetail] = useState<EventLogEntryDto | null>(null)
 
   useEffect(() => {
@@ -73,6 +75,7 @@ function EventLogsView({ presetKey }: { presetKey?: string }) {
       levels: levels.length ? levels.join(',') : undefined,
       keyword: keyword || undefined,
       user: user || undefined,
+      excludeSystemAccounts: isAuthPreset ? excludeSystem : undefined,
     })
   })
 
@@ -88,6 +91,15 @@ function EventLogsView({ presetKey }: { presetKey?: string }) {
     }
     if (isCustom && logName) refresh()
   }, [logName]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const isFirstRenderExcludeSystem = useRef(true)
+  useEffect(() => {
+    if (isFirstRenderExcludeSystem.current) {
+      isFirstRenderExcludeSystem.current = false
+      return
+    }
+    if (isAuthPreset) refresh()
+  }, [excludeSystem]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const columns: ColumnsType<EventLogEntryDto> = [
     { title: 'Время', dataIndex: 'timeCreated', render: (d: string) => formatDateTime(d), width: 180 },
@@ -170,6 +182,14 @@ function EventLogsView({ presetKey }: { presetKey?: string }) {
             onChange={(e) => setUser(e.target.value)}
             onSearch={() => refresh()}
           />
+          {isAuthPreset && (
+            <Switch
+              checked={excludeSystem}
+              onChange={setExcludeSystem}
+              checkedChildren="Только пользователи"
+              unCheckedChildren="Все записи"
+            />
+          )}
           <Button type="primary" onClick={() => refresh()} loading={loading}>Применить</Button>
         </Space>
       </Card>

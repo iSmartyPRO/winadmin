@@ -175,6 +175,7 @@ export interface EventLogQueryParams {
   levels?: string
   keyword?: string
   user?: string
+  excludeSystemAccounts?: boolean
 }
 
 export interface EventLogQueryResult {
