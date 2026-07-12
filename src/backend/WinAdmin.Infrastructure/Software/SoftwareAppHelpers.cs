@@ -96,7 +96,6 @@ public static class SoftwareAppHelpers
     public static bool IsStoreSystemPackage(string packageFamilyOrFullName)
     {
         var family = packageFamilyOrFullName;
-        var us = family.IndexOf('_');
         // PackageFullName: Name_Version_Arch_Resource_PublisherId - family is Name_PublisherId
         // For simplicity: check if any known family is a prefix of the string or equals Name before first _
         foreach (var sys in StoreSystemFamilies)

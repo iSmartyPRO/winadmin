@@ -13,6 +13,16 @@ public sealed class SoftwareAppHelpersTests
         Assert.Equal(expected, SoftwareAppHelpers.IsRegistrySystem(systemComponent, parentKeyName, displayName: "App"));
     }
 
+    [Theory]
+    [InlineData("Update for Windows", true)]
+    [InlineData("Security Update for Microsoft Office", true)]
+    [InlineData("Hotfix for Windows Server", true)]
+    [InlineData("Mozilla Firefox", false)]
+    public void IsRegistrySystem_DisplayNameHeuristic(string displayName, bool expected)
+    {
+        Assert.Equal(expected, SoftwareAppHelpers.IsRegistrySystem(0, null, displayName));
+    }
+
     [Fact]
     public void CanUninstallRegistry_RequiresUninstallString()
     {
