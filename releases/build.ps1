@@ -51,7 +51,16 @@ dotnet publish "$Root\src\backend\WinAdmin.Api\WinAdmin.Api.csproj" `
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish завершился с ошибкой." }
 Ok "Пакет → $OutputPath"
 
-# ── 3. Итог ───────────────────────────────────────────────────────────────────
+# ── 3. Документация и скрипты установки ─────────────────────────────────────────
+Step "Копирование документации пакета"
+$PackageDir = "$PSScriptRoot\package"
+if (Test-Path $PackageDir) {
+    Copy-Item "$PackageDir\*" $OutputPath -Recurse -Force
+    Copy-Item "$PSScriptRoot\install-service.ps1" $OutputPath -Force
+    Ok "README, docs, install-service.ps1 → $OutputPath"
+}
+
+# ── 4. Итог ───────────────────────────────────────────────────────────────────
 $SizeMb = [math]::Round((Get-ChildItem $OutputPath -Recurse | Measure-Object Length -Sum).Sum / 1MB)
 Write-Host "`nГотово. Размер пакета: ~$SizeMb МБ" -ForegroundColor Green
 Write-Host @"
@@ -61,7 +70,6 @@ Write-Host @"
   2. Запуск без IIS (нулевые зависимости):
        .\WinAdmin.Api.exe --urls http://localhost:8080
   3. Запуск как Windows Service:
-       sc.exe create WinAdmin binPath="C:\WinAdmin\WinAdmin.Api.exe --urls http://localhost:8080"
-       sc.exe start WinAdmin
+       .\install-service.ps1 -Port 8080
   4. Под IIS: нужен ASP.NET Core Hosting Bundle (~25 МБ), затем releases\install.ps1
 "@ -ForegroundColor Yellow

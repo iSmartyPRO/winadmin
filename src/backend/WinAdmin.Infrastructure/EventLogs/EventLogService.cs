@@ -65,6 +65,13 @@ public sealed class EventLogService : IEventLogService
                     try { xml = record.ToXml(); }
                     catch (EventLogException) { xml = null; }
 
+                    if (xml != null && request.ExcludeLogonTypes is { Count: > 0 })
+                    {
+                        var logonType = EventLogQueryHelpers.ExtractLogonType(xml);
+                        if (logonType is int lt && request.ExcludeLogonTypes.Contains(lt))
+                            continue;
+                    }
+
                     var (extractedName, sid) = xml != null
                         ? EventLogQueryHelpers.ExtractUserInfo(xml)
                         : ((string?)null, (string?)null);

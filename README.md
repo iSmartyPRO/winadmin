@@ -4,6 +4,8 @@
 станцией или сервером). Один экземпляр на машину; управляет локальной системой и
 предоставляет REST API для интеграции с внешними системами.
 
+Репозиторий: https://github.com/iSmartyPRO/winadmin
+
 - Техническая информация: ОС, CPU, RAM, BIOS, сеть
 - Диски и разделы с заполнением
 - Live-метрики CPU/память/сеть
@@ -49,8 +51,12 @@ npm --prefix src/frontend run dev        # http://localhost:5188
 
 ```powershell
 .\releases\build.ps1                             # → releases/dist/
+.\releases\build.ps1 -OutputPath releases\v1.0.0 # версионированная папка
 .\releases\build.ps1 -OutputPath C:\MyBuild      # своя папка
 ```
+
+Готовый пакет (~150 МБ) **не коммитится в git** — собирается скриптом.  
+См. [releases/README.md](releases/README.md).
 
 Скопируйте папку на любую Windows-машину и запустите:
 
@@ -68,6 +74,85 @@ sc.exe start WinAdmin
 ```powershell
 dotnet test
 ```
+
+## Журналы Windows: размер журнала Security
+
+Пресет **«Авторизация»** читает журнал `Security`. По умолчанию Windows хранит его в
+режиме **Circular** с лимитом **20 МБ** — при заполнении старые записи перезаписываются.
+На активной машине это часто даёт охват **минут или часов**, а не дней: фильтр «30 дней»
+в WinAdmin не вернёт события, которых уже нет на диске.
+
+Чтение `Security` требует запуска WinAdmin **от имени администратора** (иначе API вернёт
+403).
+
+### Проверить текущие настройки
+
+```powershell
+# wevtutil (встроенная утилита)
+wevtutil gl Security
+
+# или PowerShell
+Get-WinEvent -ListLog Security | Select-Object LogName, LogMode, RecordCount,
+  @{n='MaxSizeMB';e={[math]::Round($_.MaximumSizeInBytes/1MB,1)}},
+  @{n='FileSizeMB';e={[math]::Round($_.FileSize/1MB,1)}}
+
+# самая старая и новая запись (реальный охват журнала)
+(Get-WinEvent -LogName Security -Oldest -MaxEvents 1).TimeCreated
+(Get-WinEvent -LogName Security -MaxEvents 1).TimeCreated
+```
+
+### Увеличить размер (нужны права администратора)
+
+Размер задаётся в байтах (`/ms:`). Примеры готовых значений:
+
+```powershell
+# 128 МБ  — заметно лучше дефолта, обычно хватает на рабочей станции
+wevtutil sl Security /ms:134217728
+
+# 512 МБ  — рекомендуемый минимум, если нужна история за дни
+wevtutil sl Security /ms:536870912
+
+# 1 ГБ    — для серверов или интенсивного аудита
+wevtutil sl Security /ms:1073741824
+```
+
+Тот же эффект через PowerShell:
+
+```powershell
+Limit-EventLog -LogName Security -MaximumSize 512MB
+```
+
+Проверка после изменения:
+
+```powershell
+wevtutil gl Security | findstr /i "maxSize"
+Get-WinEvent -ListLog Security | Select-Object MaximumSizeInBytes, FileSize
+```
+
+**Важно:** увеличение лимита не восстанавливает уже перезаписанные события — история
+начнёт накапливаться только с момента применения настройки.
+
+### Дополнительно (по желанию)
+
+Включить журнал, если отключён:
+
+```powershell
+wevtutil sl Security /e:true
+```
+
+Задать политику при заполнении (по умолчанию — перезапись, `Circular`):
+
+```powershell
+# перезаписывать старые (типично для Security)
+wevtutil sl Security /rt:true
+
+# не перезаписывать — новые события не пишутся, пока журнал полон (редко нужно)
+wevtutil sl Security /rt:false
+```
+
+На нескольких машинах тот же лимит можно задать через GPO:
+**Конфигурация компьютера → Политики → Административные шаблоны →
+Компоненты Windows → Event Log Service → Security**.
 
 ## Развёртывание под IIS
 

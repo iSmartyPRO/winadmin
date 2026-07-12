@@ -91,6 +91,28 @@ public static class EventLogQueryHelpers
     }
 
     /// <summary>
+    /// Извлекает тип входа (LogonType) из EventData записи. Возвращает null, если поля нет
+    /// (события без входа — например 4672 или изменения учётных записей) или оно не числовое.
+    /// </summary>
+    public static int? ExtractLogonType(string recordXml)
+    {
+        XDocument doc;
+        try
+        {
+            doc = XDocument.Parse(recordXml);
+        }
+        catch (System.Xml.XmlException)
+        {
+            return null;
+        }
+
+        var value = doc.Descendants(EventNs + "Data")
+            .FirstOrDefault(d => (string?)d.Attribute("Name") == "LogonType")?.Value;
+
+        return int.TryParse(value, out var logonType) ? logonType : null;
+    }
+
+    /// <summary>
     /// Определяет встроенную системную учётную запись по SID (языконезависимо — SID не
     /// переводится): SYSTEM/LOCAL SERVICE/NETWORK SERVICE, либо по суффиксу "$" в имени
     /// (машинный аккаунт — соглашение именования NetBIOS, тоже не зависит от языка). Если SID

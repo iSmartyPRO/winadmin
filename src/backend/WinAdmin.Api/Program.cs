@@ -25,7 +25,16 @@ if (args.Length > 0 && args[0] == "user")
     return await WinAdmin.Api.Cli.CliRunner.RunAsync(args, cliConfig);
 }
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    // Для запуска как Windows Service рабочий каталог службы — System32,
+    // поэтому фиксируем content root на папке приложения (wwwroot, appsettings, БД).
+    ContentRootPath = AppContext.BaseDirectory,
+});
+
+// Включает интеграцию с SCM (отклик на старт/стоп). No-op при запуске как консоль или под IIS.
+builder.Host.UseWindowsService();
 
 // ── Конфигурация ────────────────────────────────────────────────
 string? configuredDbPath = builder.Configuration["WinAdmin:DatabasePath"];

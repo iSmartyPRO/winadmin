@@ -155,6 +155,43 @@ public sealed class EventLogQueryHelpersTests
         Assert.Null(sid);
     }
 
+    [Fact]
+    public void ExtractLogonType_ReturnsParsedValue()
+    {
+        const string xml = """
+            <Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'>
+              <System><EventID>4624</EventID></System>
+              <EventData>
+                <Data Name='TargetUserName'>SYSTEM</Data>
+                <Data Name='LogonType'>5</Data>
+              </EventData>
+            </Event>
+            """;
+
+        Assert.Equal(5, EventLogQueryHelpers.ExtractLogonType(xml));
+    }
+
+    [Fact]
+    public void ExtractLogonType_ReturnsNull_WhenFieldMissing()
+    {
+        const string xml = """
+            <Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'>
+              <System><EventID>4672</EventID></System>
+              <EventData>
+                <Data Name='SubjectUserName'>SYSTEM</Data>
+              </EventData>
+            </Event>
+            """;
+
+        Assert.Null(EventLogQueryHelpers.ExtractLogonType(xml));
+    }
+
+    [Fact]
+    public void ExtractLogonType_ReturnsNull_OnMalformedXml()
+    {
+        Assert.Null(EventLogQueryHelpers.ExtractLogonType("<Event><Unclosed>"));
+    }
+
     [Theory]
     [InlineData("S-1-5-18", "SYSTEM", true)]
     [InlineData("S-1-5-18", "СИСТЕМА", true)]

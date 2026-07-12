@@ -13,17 +13,25 @@ appsettings.Production.json
 
 # Node / Vite
 node_modules/
-web/dist/
+src/frontend/dist/
 
-# Собранный SPA (генерируется из web/ — пересобирается при publish)
-src/SysPanel.Api/wwwroot/assets/
-src/SysPanel.Api/wwwroot/index.html
+# Собранный SPA (генерируется: npm --prefix src/frontend run build)
+src/backend/WinAdmin.Api/wwwroot/assets/
+src/backend/WinAdmin.Api/wwwroot/index.html
+
+# Готовые пакеты (собираются: .\releases\build.ps1 -OutputPath releases\v1.0.0)
+releases/dist/
+releases/v*/
 
 # Логи
 logs/
 run.log
 *.log
 
-# IDE
+# IDE / агенты
 .vs/
 .idea/
+.claude/
+
+# Временные файлы
+tmp-*

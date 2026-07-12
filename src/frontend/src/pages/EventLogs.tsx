@@ -13,6 +13,8 @@ import type { EventLogEntryDto } from '../api/types'
 import PageHeader from '../components/PageHeader'
 import { formatDateTime } from '../utils/format'
 import { findPreset } from '../config/eventLogPresets'
+import { groupAuthEvents, isAuthEventGroup } from '../utils/authEventGrouping'
+import type { AuthEventRow } from '../utils/authEventGrouping'
 
 const { RangePicker } = DatePicker
 const { Text, Paragraph } = Typography
@@ -76,6 +78,8 @@ function EventLogsView({ presetKey }: { presetKey?: string }) {
       keyword: keyword || undefined,
       user: user || undefined,
       excludeSystemAccounts: isAuthPreset ? excludeSystem : undefined,
+      // В пресете «Авторизация» скрываем фоновый шум: служебные (5) и сетевые (3) входы.
+      excludeLogonTypes: isAuthPreset ? '3,5' : undefined,
     })
   })
 
@@ -101,23 +105,43 @@ function EventLogsView({ presetKey }: { presetKey?: string }) {
     if (isAuthPreset) refresh()
   }, [excludeSystem]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const columns: ColumnsType<EventLogEntryDto> = [
-    { title: 'Время', dataIndex: 'timeCreated', render: (d: string) => formatDateTime(d), width: 180 },
+  const tableData: AuthEventRow[] = isAuthPreset
+    ? groupAuthEvents(data?.entries ?? [])
+    : (data?.entries ?? [])
+
+  const columns: ColumnsType<AuthEventRow> = [
+    {
+      title: 'Время', dataIndex: 'timeCreated', width: 180,
+      render: (d: string) => formatDateTime(d),
+    },
     {
       title: 'Уровень', dataIndex: 'levelDisplayName', width: 130,
-      render: (l: string | undefined, r) => (
-        <Tag color={LEVEL_COLORS[r.level ?? ''] ?? 'default'}>{l ?? r.level ?? '—'}</Tag>
-      ),
+      render: (l: string | undefined, r: AuthEventRow) => {
+        if (isAuthEventGroup(r)) return <Tag color={r.summary.color}>{r.summary.label}</Tag>
+        return <Tag color={LEVEL_COLORS[r.level ?? ''] ?? 'default'}>{l ?? r.level ?? '—'}</Tag>
+      },
     },
-    { title: 'Источник', dataIndex: 'providerName', width: 220, ellipsis: true },
-    { title: 'ID события', dataIndex: 'eventId', width: 100 },
+    {
+      title: 'Источник', dataIndex: 'providerName', width: 220, ellipsis: true,
+      render: (v: string | undefined, r: AuthEventRow) => {
+        if (isAuthEventGroup(r)) return <Text type="secondary">—</Text>
+        return v ?? <Text type="secondary">—</Text>
+      },
+    },
+    {
+      title: 'ID события', dataIndex: 'eventId', width: 100,
+      render: (v: number | undefined, r: AuthEventRow) => (isAuthEventGroup(r) ? `${r.entries.length} событий` : v),
+    },
     {
       title: 'Пользователь', dataIndex: 'user', width: 160,
       render: (u?: string) => u ?? <Text type="secondary">—</Text>,
     },
     {
       title: 'Сообщение', dataIndex: 'message', ellipsis: true,
-      render: (m?: string) => m ?? <Text type="secondary">—</Text>,
+      render: (m: string | undefined, r: AuthEventRow) => {
+        if (isAuthEventGroup(r)) return <Text type="secondary">—</Text>
+        return m ?? <Text type="secondary">—</Text>
+      },
     },
   ]
 
@@ -206,13 +230,48 @@ function EventLogsView({ presetKey }: { presetKey?: string }) {
 
       <Card variant="borderless" className="sp-glass">
         <Table
-          rowKey="id"
+          rowKey={(record) => (isAuthEventGroup(record) ? record.key : record.id)}
           size="small"
           columns={columns}
-          dataSource={data?.entries ?? []}
+          dataSource={tableData}
           loading={loading}
           pagination={{ pageSize: 25, showSizeChanger: true }}
-          onRow={(record) => ({ onClick: () => setDetail(record) })}
+          onRow={(record) => ({
+            onClick: () => {
+              if (!isAuthEventGroup(record)) setDetail(record)
+            },
+          })}
+          expandable={{
+            expandRowByClick: true,
+            rowExpandable: (record) => isAuthEventGroup(record),
+            expandedRowRender: (record) => {
+              if (!isAuthEventGroup(record)) return null
+              return (
+                <Table
+                  size="small"
+                  showHeader={false}
+                  pagination={false}
+                  rowKey="id"
+                  dataSource={record.entries}
+                  onRow={(entry) => ({ onClick: () => setDetail(entry) })}
+                  columns={[
+                    { dataIndex: 'timeCreated', width: 180, render: (d: string) => formatDateTime(d) },
+                    {
+                      dataIndex: 'levelDisplayName', width: 130,
+                      render: (l: string | undefined, r: EventLogEntryDto) => (
+                        <Tag color={LEVEL_COLORS[r.level ?? ''] ?? 'default'}>{l ?? r.level ?? '—'}</Tag>
+                      ),
+                    },
+                    { dataIndex: 'eventId', width: 100 },
+                    {
+                      dataIndex: 'message', ellipsis: true,
+                      render: (m?: string) => m ?? <Text type="secondary">—</Text>,
+                    },
+                  ]}
+                />
+              )
+            },
+          }}
         />
       </Card>
 

@@ -27,6 +27,13 @@ public sealed record EventLogQueryRequest
     public string? Keyword { get; init; }
     public string? User { get; init; }
     public bool ExcludeSystemAccounts { get; init; }
+
+    /// <summary>
+    /// Типы входа (LogonType) для исключения из выдачи. Например, служебные (5) и сетевые (3)
+    /// входы под учётной записью SYSTEM создают постоянный фоновый шум в журнале «Авторизация».
+    /// Записи без поля LogonType (например 4672 или изменения учёток) фильтр не затрагивает.
+    /// </summary>
+    public IReadOnlyList<int>? ExcludeLogonTypes { get; init; }
 }
 
 /// <summary>Результат запроса журнала: записи + признак усечения по лимиту/сканированию.</summary>
