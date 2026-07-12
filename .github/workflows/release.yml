@@ -1,0 +1,100 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version label for manual build (e.g. 1.0.1)'
+        required: true
+        default: '1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: src/frontend
+
+      - name: Set package version
+        shell: pwsh
+        run: |
+          if ("${{ github.ref_type }}" -eq 'tag') {
+            $version = "${{ github.ref_name }}" -replace '^v', ''
+          } else {
+            $version = "${{ inputs.version }}"
+          }
+          "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Set-Content -Path releases/package/VERSION -Value $version -NoNewline
+          Write-Host "Building version $version"
+
+      - name: Build self-contained package
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:GITHUB_WORKSPACE "artifacts\WinAdmin-$env:VERSION"
+          .\releases\build.ps1 -OutputPath $out
+          "OUTPUT_DIR=$out" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Create ZIP archive
+        shell: pwsh
+        run: |
+          $zip = Join-Path $env:GITHUB_WORKSPACE "artifacts\WinAdmin-$env:VERSION-win-x64.zip"
+          Compress-Archive -Path "$env:OUTPUT_DIR\*" -DestinationPath $zip -Force
+          "ZIP_PATH=$zip" | Out-File -FilePath $env:GITHUB_ENV -Append
+          $sizeMb = [math]::Round((Get-Item $zip).Length / 1MB, 1)
+          Write-Host "Archive: $zip ($sizeMb MB)"
+
+      - name: Publish GitHub Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ZIP_PATH }}
+          generate_release_notes: true
+          body: |
+            ## WinAdmin ${{ github.ref_name }}
+
+            Self-contained пакет для **Windows Server 2019+** / **Windows 10/11 x64**.
+            .NET на сервере устанавливать **не нужно**.
+
+            ### Быстрый старт
+
+            1. Скачайте `WinAdmin-*-win-x64.zip` и распакуйте, например в `C:\WinAdmin\`
+            2. PowerShell **от имени администратора**:
+               ```powershell
+               cd C:\WinAdmin
+               .\install-service.ps1 -Port 8080
+               .\WinAdmin.Api.exe user add --login admin --password "YourPassword" --scopes admin
+               ```
+            3. Откройте http://localhost:8080
+
+            Подробнее — `README.md` внутри архива.
+
+      - name: Upload artifact (manual run)
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v4
+        with:
+          name: WinAdmin-${{ env.VERSION }}-win-x64
+          path: ${{ env.ZIP_PATH }}
+          retention-days: 7

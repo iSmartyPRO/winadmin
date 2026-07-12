@@ -47,6 +47,31 @@ npm --prefix src/frontend run dev        # http://localhost:5188
 Стартовый admin-ключ создаётся при первом запуске и сохраняется в `bootstrap-key.txt`
 рядом с приложением.
 
+## Скачать готовый релиз
+
+Готовый ZIP (~150 МБ, self-contained, Windows x64) публикуется в **GitHub Releases**:
+
+**https://github.com/iSmartyPRO/winadmin/releases**
+
+1. Скачайте `WinAdmin-x.y.z-win-x64.zip`
+2. Распакуйте на сервер, например в `C:\WinAdmin\`
+3. Запустите (от администратора):
+
+```powershell
+cd C:\WinAdmin
+.\install-service.ps1 -Port 8080
+.\WinAdmin.Api.exe user add --login admin --password "YourPassword" --scopes admin
+```
+
+Новый релиз создаётся автоматически при пуше тега:
+
+```powershell
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+См. также [releases/README.md](releases/README.md).
+
 ## Сборка пакета для переноса (без зависимостей на целевой машине)
 
 ```powershell
