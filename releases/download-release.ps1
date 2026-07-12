@@ -26,7 +26,7 @@
 param(
     [string]$Repo = 'iSmartyPRO/winadmin',
     [string]$Version = '',
-    [string]$InstallPath = 'C:\WinAdmin',
+    [string]$InstallPath = 'C:\apps\WinAdmin',
     [string]$Token = ''
 )
 

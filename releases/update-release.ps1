@@ -14,7 +14,7 @@
 param(
     [string]$Repo = 'iSmartyPRO/winadmin',
     [string]$Version = '',
-    [string]$InstallPath = 'C:\WinAdmin',
+    [string]$InstallPath = 'C:\apps\WinAdmin',
     [int]$Port = 8080,
     [string]$ServiceName = 'WinAdmin',
     [string]$Token = ''

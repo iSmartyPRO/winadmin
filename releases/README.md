@@ -19,10 +19,10 @@ Invoke-WebRequest "$base/install-from-github.ps1" -OutFile "$dir\install-from-gi
 & "$dir\install-from-github.ps1" -Port 8080
 ```
 
-### Обновление (если скрипты уже в `C:\WinAdmin\`)
+### Обновление (если скрипты уже в `C:\apps\WinAdmin\`)
 
 ```powershell
-cd C:\WinAdmin
+cd C:\apps\WinAdmin
 .\update-release.ps1 -Port 8080
 ```
 

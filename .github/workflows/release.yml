@@ -80,10 +80,10 @@ jobs:
 
             ### Быстрый старт
 
-            1. Скачайте `WinAdmin-*-win-x64.zip` и распакуйте, например в `C:\WinAdmin\`
+            1. Скачайте `WinAdmin-*-win-x64.zip` и распакуйте, например в `C:\apps\WinAdmin\`
             2. PowerShell **от имени администратора**:
                ```powershell
-               cd C:\WinAdmin
+               cd C:\apps\WinAdmin
                .\install-service.ps1 -Port 8080
                .\WinAdmin.exe user add --login admin --password "YourPassword" --scopes admin
                ```

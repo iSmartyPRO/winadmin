@@ -21,7 +21,7 @@
 
 PowerShell **от имени администратора** на целевом сервере.
 
-Скачать скрипты с GitHub и установить последний релиз в `C:\WinAdmin` на порту `8080`:
+Скачать скрипты с GitHub и установить последний релиз в `C:\apps\WinAdmin` на порту `8080`:
 
 ```powershell
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -36,13 +36,13 @@ Invoke-WebRequest "$base/install-from-github.ps1" -OutFile "$dir\install-from-gi
 Конкретная версия и другой порт:
 
 ```powershell
-& "$dir\install-from-github.ps1" -Version 1.0.0 -InstallPath C:\WinAdmin -Port 9090
+& "$dir\install-from-github.ps1" -Version 1.0.0 -InstallPath C:\apps\WinAdmin -Port 9090
 ```
 
 Создать пользователя:
 
 ```powershell
-cd C:\WinAdmin
+cd C:\apps\WinAdmin
 .\WinAdmin.exe user add --login admin --password "YourPassword" --scopes admin
 ```
 
@@ -58,16 +58,16 @@ Invoke-WebRequest 'https://raw.githubusercontent.com/iSmartyPRO/winadmin/main/re
   -OutFile "$dir\download-release.ps1" -UseBasicParsing
 
 # последний релиз
-& "$dir\download-release.ps1" -InstallPath C:\WinAdmin
+& "$dir\download-release.ps1" -InstallPath C:\apps\WinAdmin
 
 # или конкретная версия
-& "$dir\download-release.ps1" -Version 1.0.0 -InstallPath C:\WinAdmin
+& "$dir\download-release.ps1" -Version 1.0.0 -InstallPath C:\apps\WinAdmin
 ```
 
 Затем вручную:
 
 ```powershell
-cd C:\WinAdmin
+cd C:\apps\WinAdmin
 .\install-service.ps1 -Port 8080
 ```
 
@@ -75,12 +75,12 @@ cd C:\WinAdmin
 
 ## Вариант C — если скрипты уже в папке установки
 
-После первой установки `download-release.ps1` и `update-release.ps1` лежат в `C:\WinAdmin\`.
+После первой установки `download-release.ps1` и `update-release.ps1` лежат в `C:\apps\WinAdmin\`.
 
 **Обновление до последней версии:**
 
 ```powershell
-cd C:\WinAdmin
+cd C:\apps\WinAdmin
 .\update-release.ps1 -Port 8080
 ```
 
@@ -98,7 +98,7 @@ cd C:\WinAdmin
 
 1. Откройте https://github.com/iSmartyPRO/winadmin/releases  
 2. Скачайте `WinAdmin-x.y.z-win-x64.zip`  
-3. Распакуйте в `C:\WinAdmin\`  
+3. Распакуйте в `C:\apps\WinAdmin\`  
 4. Запустите `install-service.ps1` (см. README.md в корне пакета)
 
 ---
@@ -109,7 +109,7 @@ cd C:\WinAdmin
 
 ```powershell
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-$installDir = 'C:\WinAdmin'
+$installDir = 'C:\apps\WinAdmin'
 $repo = 'iSmartyPRO/winadmin'
 
 $release = Invoke-RestMethod "https://api.github.com/repos/$repo/releases/latest" -Headers @{ 'User-Agent' = 'WinAdmin' }
@@ -144,7 +144,7 @@ $asset = $release.assets | Where-Object { $_.name -eq "WinAdmin-$version-win-x64
 |---|---|---|
 | `-Repo` | `iSmartyPRO/winadmin` | Репозиторий GitHub |
 | `-Version` | (пусто) | Версия без `v`; пусто = latest |
-| `-InstallPath` | `C:\WinAdmin` | Куда распаковать |
+| `-InstallPath` | `C:\apps\WinAdmin` | Куда распаковать |
 | `-Token` | (пусто) | PAT для private repo |
 
 ### install-from-github.ps1
@@ -166,7 +166,7 @@ $asset = $release.assets | Where-Object { $_.name -eq "WinAdmin-$version-win-x64
 
 ```powershell
 $token = 'ghp_xxxxxxxx'
-& .\download-release.ps1 -Token $token -InstallPath C:\WinAdmin
+& .\download-release.ps1 -Token $token -InstallPath C:\apps\WinAdmin
 ```
 
 ---

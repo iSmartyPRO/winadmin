@@ -1,4 +1,4 @@
-# WinAdmin v1.0.3 — быстрый запуск
+# WinAdmin v1.0.4 — быстрый запуск
 
 Self-contained пакет для **Windows Server 2019** (и новее), **x64**.  
 .NET на сервере **устанавливать не нужно** — runtime уже внутри папки.
@@ -26,7 +26,7 @@ Self-contained пакет для **Windows Server 2019** (и новее), **x64*
 
 1. Скопируйте **всю папку** `v1.0.0` на целевой сервер, например:
    ```
-   C:\WinAdmin\
+   C:\apps\WinAdmin\
    ```
 2. Убедитесь, что на сервере **Windows x64** (не 32-bit).
 
@@ -39,7 +39,7 @@ Self-contained пакет для **Windows Server 2019** (и новее), **x64*
 Откройте **PowerShell от имени администратора**:
 
 ```powershell
-cd C:\WinAdmin
+cd C:\apps\WinAdmin
 .\WinAdmin.exe --urls http://0.0.0.0:8080
 ```
 
@@ -64,7 +64,7 @@ Invoke-RestMethod http://localhost:8080/health
 PowerShell, пока приложение работает):
 
 ```powershell
-cd C:\WinAdmin
+cd C:\apps\WinAdmin
 .\WinAdmin.exe user add --login admin --password "ВашНадёжныйПароль" --scopes admin
 ```
 
@@ -80,7 +80,7 @@ cd C:\WinAdmin
 В PowerShell **от имени администратора**, из папки установки:
 
 ```powershell
-cd C:\WinAdmin
+cd C:\apps\WinAdmin
 .\install-service.ps1 -Port 8080
 ```
 
@@ -108,7 +108,7 @@ sc.exe delete WinAdmin
 ### Ручная установка службы (без скрипта)
 
 ```powershell
-sc.exe create WinAdmin binPath="C:\WinAdmin\WinAdmin.exe --urls http://0.0.0.0:8080" start= auto
+sc.exe create WinAdmin binPath="C:\apps\WinAdmin\WinAdmin.exe --urls http://0.0.0.0:8080" start= auto
 sc.exe start WinAdmin
 ```
 
