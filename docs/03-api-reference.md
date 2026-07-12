@@ -102,50 +102,65 @@
 ## Software
 
 Установленные приложения (реестр Uninstall + Microsoft Store) и обновления Windows.
+Идентификаторы имеют **префиксы**: `reg:` (реестр), `store:` (Microsoft Store), `upd:` (KB).
+В path-параметрах `{id}` значение должно быть **URL-encoded**
+(например `reg:Google.Chrome` → `reg%3AGoogle.Chrome`).
+
 Деструктивные операции (uninstall / rollback) выполняются **фоновыми jobs** с polling
 статуса. Jobs хранятся **в памяти процесса** — после перезапуска WinAdmin теряются;
-завершённые jobs удаляются по TTL (~1 ч). Одновременно допускается **не более одной**
-активной операции (`Queued`/`Running`); повторный старт → `409` с id активного job.
+завершённые jobs удаляются по TTL (~1 ч). Job в статусе `Running` дольше **30 минут**
+автоматически переводится в `Failed`. Одновременно допускается **не более одной**
+активной операции (`Queued`/`Running`); повторный старт → `409`:
+
+```json
+{ "message": "Уже выполняется операция удаления", "activeJobId": "a1b2c3" }
+```
 
 ### `GET /software/applications` — scope `software.read`
 Список установленных приложений.
 
 ```json
-[ { "id": "Google.Chrome", "name": "Google Chrome", "version": "126.0.6478.127",
+[ { "id": "reg:Google.Chrome", "name": "Google Chrome", "version": "126.0.6478.127",
     "publisher": "Google LLC", "installDate": "2025-03-15T00:00:00",
     "installLocation": "C:\\Program Files\\Google\\Chrome\\Application",
     "sizeBytes": 524288000, "source": "Registry", "isSystem": false,
-    "canUninstall": true, "uninstallString": "..." } ]
+    "canUninstall": true, "uninstallString": "..." },
+  { "id": "store:Microsoft.WindowsTerminal_8wekyb3d8bbwe!App", "name": "Terminal",
+    "version": "1.20.11281.0", "publisher": "Microsoft Corporation", "installDate": null,
+    "installLocation": null, "sizeBytes": null, "source": "Store", "isSystem": false,
+    "canUninstall": true, "uninstallString": null } ]
 ```
 
 `source`: `Registry` | `Store`. Поле `isSystem` — системные/фреймворковые пакеты
 (по умолчанию скрываются в UI). `canUninstall` — доступно ли удаление.
 
 ### `POST /software/applications/{id}/uninstall` — scope `software.manage`
-Запускает удаление приложения. `{id}` — URL-encoded (`PackageFullName` или ключ реестра).
+Запускает удаление приложения. `{id}` — prefixed id (`reg:…` или `store:…`), URL-encoded.
 Ответ `202` + `SoftwareJob`. Неизвестный id → `404`; нельзя удалить → `400`;
-активный job уже есть → `409`.
+активный job уже есть → `409` (см. тело выше).
 
 ### `GET /software/updates` — scope `software.read`
 Список установленных обновлений Windows.
 
 ```json
-[ { "id": "KB5039893", "kbArticle": "KB5039893", "title": "2024-06 Cumulative Update",
+[ { "id": "upd:KB5039893", "kbArticle": "KB5039893", "title": "2024-06 Cumulative Update",
     "description": "...", "installedOn": "2024-06-12T00:00:00",
     "canUninstall": true, "canRollback": false } ]
 ```
 
 ### `POST /software/updates/{id}/uninstall` — scope `software.manage`
-Удаление обновления. Ответ `202` + `SoftwareJob`. Ошибки — как у applications.
+Удаление обновления. `{id}` — prefixed id (`upd:KB…`), URL-encoded.
+Ответ `202` + `SoftwareJob`. Ошибки — как у applications.
 
 ### `POST /software/updates/{id}/rollback` — scope `software.manage`
-Откат обновления (только если `canRollback=true`). Ответ `202` + `SoftwareJob`.
+Откат обновления (только если `canRollback=true`). `{id}` — prefixed id (`upd:KB…`), URL-encoded.
+Ответ `202` + `SoftwareJob`.
 
 ### `GET /software/jobs/{jobId}` — scope `software.manage`
 Текущий статус job (polling ~1 с из UI).
 
 ```json
-{ "id": "a1b2c3", "type": "UninstallApp", "targetId": "Google.Chrome",
+{ "id": "a1b2c3", "type": "UninstallApp", "targetId": "reg:Google.Chrome",
   "targetName": "Google Chrome", "status": "Running", "progressPercent": 45,
   "statusMessage": "Удаление…", "error": null,
   "startedAt": "2026-07-12T10:00:00Z", "finishedAt": null }
