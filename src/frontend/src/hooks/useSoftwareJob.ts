@@ -11,7 +11,8 @@ const terminalStatuses = new Set<SoftwareJob['status']>(['Succeeded', 'Failed'])
 export function useSoftwareJob({ onTerminal }: UseSoftwareJobOptions = {}) {
   const [job, setJob] = useState<SoftwareJob>()
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const intervalRef = useRef<number | undefined>(undefined)
+  const timeoutRef = useRef<number | undefined>(undefined)
+  const polledJobIdRef = useRef<string | undefined>(undefined)
   const terminalNotifiedRef = useRef<string | undefined>(undefined)
   const onTerminalRef = useRef(onTerminal)
 
@@ -20,10 +21,11 @@ export function useSoftwareJob({ onTerminal }: UseSoftwareJobOptions = {}) {
   }, [onTerminal])
 
   const clearPolling = useCallback(() => {
-    if (intervalRef.current !== undefined) {
-      window.clearInterval(intervalRef.current)
-      intervalRef.current = undefined
+    if (timeoutRef.current !== undefined) {
+      window.clearTimeout(timeoutRef.current)
+      timeoutRef.current = undefined
     }
+    polledJobIdRef.current = undefined
   }, [])
 
   const handleJobUpdate = useCallback((nextJob: SoftwareJob) => {
@@ -39,22 +41,34 @@ export function useSoftwareJob({ onTerminal }: UseSoftwareJobOptions = {}) {
     return true
   }, [clearPolling])
 
-  const poll = useCallback(async (jobId: string) => {
+  const pollRef = useRef<(jobId: string) => Promise<void>>(async () => {})
+
+  pollRef.current = async (jobId: string) => {
     const nextJob = await api.software.getJob(jobId)
-    handleJobUpdate(nextJob)
-  }, [handleJobUpdate])
+    if (polledJobIdRef.current !== jobId) return
+
+    const isTerminal = handleJobUpdate(nextJob)
+    if (!isTerminal && polledJobIdRef.current === jobId) {
+      timeoutRef.current = window.setTimeout(() => {
+        void pollRef.current(jobId)
+      }, 1000)
+    }
+  }
+
+  const poll = useCallback((jobId: string) => pollRef.current(jobId), [])
 
   const startPolling = useCallback((nextJob: SoftwareJob) => {
     clearPolling()
     terminalNotifiedRef.current = undefined
     setDrawerOpen(true)
+    polledJobIdRef.current = nextJob.id
 
     const isTerminal = handleJobUpdate(nextJob)
-    if (isTerminal) return
-
-    intervalRef.current = window.setInterval(() => {
-      void poll(nextJob.id)
-    }, 1000)
+    if (!isTerminal) {
+      timeoutRef.current = window.setTimeout(() => {
+        void poll(nextJob.id)
+      }, 1000)
+    }
   }, [clearPolling, handleJobUpdate, poll])
 
   const restoreActive = useCallback(async () => {
