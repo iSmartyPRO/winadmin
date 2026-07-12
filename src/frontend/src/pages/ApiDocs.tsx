@@ -17,6 +17,13 @@ const endpoints = [
   { method: 'POST', path: '/api/v1/power/reboot', scope: 'power.manage', desc: 'Перезагрузка' },
   { method: 'POST', path: '/api/v1/power/shutdown', scope: 'power.manage', desc: 'Выключение' },
   { method: 'POST', path: '/api/v1/power/cancel', scope: 'power.manage', desc: 'Отмена действия питания' },
+  { method: 'GET', path: '/api/v1/software/applications', scope: 'software.read', desc: 'Установленные приложения' },
+  { method: 'POST', path: '/api/v1/software/applications/{id}/uninstall', scope: 'software.manage', desc: 'Удалить приложение (202 + job)' },
+  { method: 'GET', path: '/api/v1/software/updates', scope: 'software.read', desc: 'Установленные обновления Windows' },
+  { method: 'POST', path: '/api/v1/software/updates/{id}/uninstall', scope: 'software.manage', desc: 'Удалить обновление (202 + job)' },
+  { method: 'POST', path: '/api/v1/software/updates/{id}/rollback', scope: 'software.manage', desc: 'Откатить обновление (202 + job)' },
+  { method: 'GET', path: '/api/v1/software/jobs/{jobId}', scope: 'software.manage', desc: 'Статус фоновой операции' },
+  { method: 'GET', path: '/api/v1/software/jobs/active', scope: 'software.manage', desc: 'Активная операция или 204' },
   { method: 'GET', path: '/api/v1/apikeys', scope: 'admin', desc: 'Список ключей' },
   { method: 'GET', path: '/api/v1/audit', scope: 'admin', desc: 'Журнал аудита' },
 ]

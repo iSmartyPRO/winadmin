@@ -4,8 +4,9 @@
 Аутентификация: заголовок `X-API-Key: sp_<секрет>` (кроме `/health`).
 Интерактивная спецификация: `/swagger`, машиночитаемая: `/swagger/v1/swagger.json`.
 
-Коды ответов: `200` OK · `201` создано · `400` неверный запрос · `401` нет/неверный ключ ·
-`403` нет нужного scope · `404` не найдено · `409` действие не выполнено · `429` лимит запросов.
+Коды ответов: `200` OK · `201` создано · `202` принято (фоновая операция) · `204` нет содержимого ·
+`400` неверный запрос · `401` нет/неверный ключ · `403` нет нужного scope · `404` не найдено ·
+`409` действие не выполнено · `429` лимит запросов.
 
 ---
 
@@ -97,6 +98,67 @@
 
 ### `POST /power/cancel` — scope `power.manage`
 Отменяет запланированное действие. Ответ: `OperationResult`.
+
+## Software
+
+Установленные приложения (реестр Uninstall + Microsoft Store) и обновления Windows.
+Деструктивные операции (uninstall / rollback) выполняются **фоновыми jobs** с polling
+статуса. Jobs хранятся **в памяти процесса** — после перезапуска WinAdmin теряются;
+завершённые jobs удаляются по TTL (~1 ч). Одновременно допускается **не более одной**
+активной операции (`Queued`/`Running`); повторный старт → `409` с id активного job.
+
+### `GET /software/applications` — scope `software.read`
+Список установленных приложений.
+
+```json
+[ { "id": "Google.Chrome", "name": "Google Chrome", "version": "126.0.6478.127",
+    "publisher": "Google LLC", "installDate": "2025-03-15T00:00:00",
+    "installLocation": "C:\\Program Files\\Google\\Chrome\\Application",
+    "sizeBytes": 524288000, "source": "Registry", "isSystem": false,
+    "canUninstall": true, "uninstallString": "..." } ]
+```
+
+`source`: `Registry` | `Store`. Поле `isSystem` — системные/фреймворковые пакеты
+(по умолчанию скрываются в UI). `canUninstall` — доступно ли удаление.
+
+### `POST /software/applications/{id}/uninstall` — scope `software.manage`
+Запускает удаление приложения. `{id}` — URL-encoded (`PackageFullName` или ключ реестра).
+Ответ `202` + `SoftwareJob`. Неизвестный id → `404`; нельзя удалить → `400`;
+активный job уже есть → `409`.
+
+### `GET /software/updates` — scope `software.read`
+Список установленных обновлений Windows.
+
+```json
+[ { "id": "KB5039893", "kbArticle": "KB5039893", "title": "2024-06 Cumulative Update",
+    "description": "...", "installedOn": "2024-06-12T00:00:00",
+    "canUninstall": true, "canRollback": false } ]
+```
+
+### `POST /software/updates/{id}/uninstall` — scope `software.manage`
+Удаление обновления. Ответ `202` + `SoftwareJob`. Ошибки — как у applications.
+
+### `POST /software/updates/{id}/rollback` — scope `software.manage`
+Откат обновления (только если `canRollback=true`). Ответ `202` + `SoftwareJob`.
+
+### `GET /software/jobs/{jobId}` — scope `software.manage`
+Текущий статус job (polling ~1 с из UI).
+
+```json
+{ "id": "a1b2c3", "type": "UninstallApp", "targetId": "Google.Chrome",
+  "targetName": "Google Chrome", "status": "Running", "progressPercent": 45,
+  "statusMessage": "Удаление…", "error": null,
+  "startedAt": "2026-07-12T10:00:00Z", "finishedAt": null }
+```
+
+`type`: `UninstallApp` | `UninstallUpdate` | `RollbackUpdate`.
+`status`: `Queued` | `Running` | `Succeeded` | `Failed`.
+`progressPercent` — `0`–`100` или `null` (неопределённый прогресс).
+Job не найден → `404`.
+
+### `GET /software/jobs/active` — scope `software.manage`
+Текущий активный job (`Queued`/`Running`) или `204 No Content`, если операций нет.
+Используется UI для восстановления drawer после перезагрузки страницы.
 
 ## Администрирование
 
