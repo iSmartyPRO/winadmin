@@ -225,9 +225,11 @@ public sealed class SoftwareJobService : ISoftwareJobService
             {
                 Actor = "system",
                 Action = state.AuditAction,
-                Target = state.TargetId,
+                Target = string.IsNullOrWhiteSpace(state.TargetName) ? state.TargetId : state.TargetName,
                 Success = success,
-                Details = details,
+                Details = string.IsNullOrWhiteSpace(details)
+                    ? $"Target id: {state.TargetId}"
+                    : $"{details} Target id: {state.TargetId}",
             });
         }
         catch (Exception ex)
@@ -260,7 +262,7 @@ public sealed class SoftwareJobService : ISoftwareJobService
         if (string.IsNullOrWhiteSpace(app.UninstallString))
             throw new SoftwareActionNotAllowedException($"Application '{app.Id}' does not have an uninstall command.");
 
-        var (fileName, arguments) = SplitCommand(app.UninstallString);
+        var (fileName, arguments) = SoftwareAppHelpers.SplitCommand(app.UninstallString);
         return SoftwareJobCommand.Process(fileName, arguments);
     }
 
@@ -281,27 +283,6 @@ public sealed class SoftwareJobService : ISoftwareJobService
             kb = kb[2..];
 
         return SoftwareJobCommand.Process("wusa.exe", $"/uninstall /kb:{kb} /quiet /norestart");
-    }
-
-    private static (string FileName, string Arguments) SplitCommand(string command)
-    {
-        var trimmed = command.Trim();
-        if (trimmed.Length == 0)
-            throw new SoftwareActionNotAllowedException("Uninstall command is empty.");
-
-        if (trimmed[0] == '"')
-        {
-            var endQuote = trimmed.IndexOf('"', 1);
-            if (endQuote < 0)
-                return (trimmed.Trim('"'), string.Empty);
-
-            return (trimmed[1..endQuote], trimmed[(endQuote + 1)..].TrimStart());
-        }
-
-        var split = trimmed.IndexOf(' ');
-        return split < 0
-            ? (trimmed, string.Empty)
-            : (trimmed[..split], trimmed[(split + 1)..].TrimStart());
     }
 
     private static bool IsActive(SoftwareJobState state)

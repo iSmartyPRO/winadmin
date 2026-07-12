@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using WinAdmin.Core.Models;
 
 namespace WinAdmin.Infrastructure.Software;
 
@@ -9,6 +10,7 @@ public static class SoftwareAppHelpers
     public const string RegistryPrefix = "reg:";
     public const string StorePrefix = "store:";
     public const string UpdatePrefix = "upd:";
+    private static readonly string[] ExecutableExtensions = [".exe", ".msi", ".bat", ".cmd"];
 
     private static readonly HashSet<string> StoreSystemFamilies = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -91,6 +93,55 @@ public static class SoftwareAppHelpers
         }
         // Non-MSI: return as-is; many support /S - do not invent flags blindly
         return s;
+    }
+
+    public static (string FileName, string Arguments) SplitCommand(string command)
+    {
+        var trimmed = command.Trim();
+        if (trimmed.Length == 0)
+            throw new SoftwareActionNotAllowedException("Uninstall command is empty.");
+
+        if (trimmed[0] == '"')
+        {
+            var endQuote = trimmed.IndexOf('"', 1);
+            if (endQuote < 0)
+                return (trimmed.Trim('"'), string.Empty);
+
+            return (trimmed[1..endQuote], trimmed[(endQuote + 1)..].TrimStart());
+        }
+
+        var executablePath = FindExistingExecutablePath(trimmed);
+        if (executablePath is not null)
+            return (executablePath, trimmed[executablePath.Length..].TrimStart());
+
+        var split = trimmed.IndexOf(' ');
+        return split < 0
+            ? (trimmed, string.Empty)
+            : (trimmed[..split], trimmed[(split + 1)..].TrimStart());
+    }
+
+    private static string? FindExistingExecutablePath(string command)
+    {
+        foreach (var boundary in GetTokenBoundaries(command))
+        {
+            var candidate = command[..boundary];
+            if (ExecutableExtensions.Contains(Path.GetExtension(candidate), StringComparer.OrdinalIgnoreCase) &&
+                File.Exists(candidate))
+                return candidate;
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<int> GetTokenBoundaries(string command)
+    {
+        for (var i = 0; i < command.Length; i++)
+        {
+            if (char.IsWhiteSpace(command[i]) && i > 0)
+                yield return i;
+        }
+
+        yield return command.Length;
     }
 
     public static bool IsStoreSystemPackage(string packageFamilyOrFullName)

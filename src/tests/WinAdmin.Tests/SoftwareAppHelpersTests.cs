@@ -49,6 +49,30 @@ public sealed class SoftwareAppHelpersTests
     }
 
     [Fact]
+    public void SplitCommand_UsesExistingUnquotedExecutablePathWithSpaces()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "WinAdmin Tests", Guid.NewGuid().ToString("N"));
+        var appDir = Path.Combine(root, "Program Files", "Vendor App");
+        var executable = Path.Combine(appDir, "uninstall.exe");
+
+        try
+        {
+            Directory.CreateDirectory(appDir);
+            File.WriteAllText(executable, string.Empty);
+
+            var (fileName, arguments) = SoftwareAppHelpers.SplitCommand($"{executable} /S");
+
+            Assert.Equal(executable, fileName);
+            Assert.Equal("/S", arguments);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Ids_RoundTrip()
     {
         var reg = SoftwareAppHelpers.MakeRegistryId("{GUID}");

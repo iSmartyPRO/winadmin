@@ -23,7 +23,7 @@ export default function Updates() {
   })
 
   useEffect(() => {
-    void restoreActive()
+    void restoreActive().catch(() => undefined)
   }, [restoreActive])
 
   const uninstall = async (update: InstalledUpdate) => {

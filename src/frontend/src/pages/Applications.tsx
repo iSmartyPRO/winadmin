@@ -26,7 +26,7 @@ export default function Applications() {
   })
 
   useEffect(() => {
-    void restoreActive()
+    void restoreActive().catch(() => undefined)
   }, [restoreActive])
 
   const rows = useMemo(

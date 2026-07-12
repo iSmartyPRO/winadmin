@@ -122,7 +122,8 @@ public sealed class SoftwareJobServiceTests
         Assert.Equal(100, done.ProgressPercent);
         Assert.Contains(audit.Entries, e =>
             e.Action == "software.app.uninstall" &&
-            e.Target == "reg:App1" &&
+            e.Target == "App1" &&
+            e.Details?.Contains("reg:App1", StringComparison.OrdinalIgnoreCase) == true &&
             e.Success);
     }
 
