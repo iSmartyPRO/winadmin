@@ -8,7 +8,7 @@ namespace WinAdmin.Infrastructure.Software;
 
 public sealed class SoftwareJobService : ISoftwareJobService
 {
-    private static readonly TimeSpan JobTimeout = TimeSpan.FromMinutes(30);
+    private static readonly TimeSpan DefaultJobTimeout = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan CompletedJobRetention = TimeSpan.FromHours(1);
 
     private readonly ConcurrentDictionary<string, SoftwareJobState> _jobs = new(StringComparer.OrdinalIgnoreCase);
@@ -16,18 +16,23 @@ public sealed class SoftwareJobService : ISoftwareJobService
     private readonly ISoftwareProcessRunner _runner;
     private readonly ILogger<SoftwareJobService> _logger;
     private readonly TimeProvider _timeProvider;
+    private readonly TimeSpan _jobTimeout;
     private readonly object _gate = new();
 
     public SoftwareJobService(
         IServiceScopeFactory scopeFactory,
         ISoftwareProcessRunner runner,
         ILogger<SoftwareJobService> logger,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        TimeSpan? jobTimeout = null)
     {
         _scopeFactory = scopeFactory;
         _runner = runner;
         _logger = logger;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _jobTimeout = jobTimeout ?? DefaultJobTimeout;
+        if (_jobTimeout <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(jobTimeout), "Job timeout must be greater than zero.");
     }
 
     public SoftwareJob StartUninstallApp(string appId)
@@ -143,7 +148,7 @@ public sealed class SoftwareJobService : ISoftwareJobService
 
     private async Task RunJobAsync(SoftwareJobState state)
     {
-        using var timeout = new CancellationTokenSource(JobTimeout);
+        using var timeout = new CancellationTokenSource(_jobTimeout);
         var success = false;
         string? details = null;
 
@@ -166,6 +171,7 @@ public sealed class SoftwareJobService : ISoftwareJobService
                     ? "Операция завершена успешно."
                     : $"Операция завершилась с кодом {exitCode}.";
 
+            await WriteAuditAsync(state, success, details);
             UpdateState(state, s =>
             {
                 s.Status = success ? SoftwareJobStatus.Succeeded : SoftwareJobStatus.Failed;
@@ -179,16 +185,16 @@ public sealed class SoftwareJobService : ISoftwareJobService
         {
             details = "Операция прервана по тайм-ауту.";
             _logger.LogWarning(ex, "Software job {JobId} timed out", state.Id);
+            await WriteAuditAsync(state, success, details);
             UpdateFailure(state, details);
         }
         catch (Exception ex)
         {
             details = ex.Message;
             _logger.LogError(ex, "Software job {JobId} failed", state.Id);
+            await WriteAuditAsync(state, success, details);
             UpdateFailure(state, details);
         }
-
-        await WriteAuditAsync(state, success, details);
     }
 
     private async Task<int> RemoveStorePackageAsync(SoftwareJobCommand command, CancellationToken ct)
@@ -203,7 +209,7 @@ public sealed class SoftwareJobService : ISoftwareJobService
         {
             s.Status = SoftwareJobStatus.Failed;
             s.ProgressPercent = 100;
-            s.StatusMessage = "Завершение...";
+            s.StatusMessage = details;
             s.Error = details;
             s.FinishedAt = _timeProvider.GetUtcNow().UtcDateTime;
         });

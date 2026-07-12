@@ -22,14 +22,23 @@ internal sealed class FakeRunner : ISoftwareProcessRunner
     public int ExitCode { get; set; }
     public Exception? ThrowOnRun { get; set; }
     public TaskCompletionSource? Gate { get; set; }
+    public bool CancellationObserved { get; private set; }
     public List<(string FileName, string Arguments)> Runs { get; } = [];
     public List<string> RemovedStorePackages { get; } = [];
 
     public async Task<int> RunAsync(string fileName, string arguments, CancellationToken ct)
     {
         Runs.Add((fileName, arguments));
-        if (Gate is not null)
-            await Gate.Task.WaitAsync(ct);
+        try
+        {
+            if (Gate is not null)
+                await Gate.Task.WaitAsync(ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            CancellationObserved = true;
+            throw;
+        }
         if (ThrowOnRun is not null)
             throw ThrowOnRun;
         return ExitCode;
@@ -45,11 +54,15 @@ internal sealed class FakeRunner : ISoftwareProcessRunner
 internal sealed class FakeAudit : IAuditService
 {
     public List<AuditEntryDto> Entries { get; } = [];
+    public TaskCompletionSource? Gate { get; set; }
+    public TaskCompletionSource WriteStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    public Task WriteAsync(AuditEntryDto entry, CancellationToken ct = default)
+    public async Task WriteAsync(AuditEntryDto entry, CancellationToken ct = default)
     {
+        WriteStarted.TrySetResult();
+        if (Gate is not null)
+            await Gate.Task.WaitAsync(ct);
         Entries.Add(entry);
-        return Task.CompletedTask;
     }
 
     public Task<IReadOnlyList<AuditEntryDto>> QueryAsync(int limit = 200, string? actor = null, CancellationToken ct = default)
@@ -69,7 +82,7 @@ internal sealed class ManualTimeProvider : TimeProvider
 
 public sealed class SoftwareJobServiceTests
 {
-    private static (SoftwareJobService Svc, FakeCatalog Catalog, FakeRunner Runner, FakeAudit Audit, ManualTimeProvider Time) Create()
+    private static (SoftwareJobService Svc, FakeCatalog Catalog, FakeRunner Runner, FakeAudit Audit, ManualTimeProvider Time) Create(TimeSpan? jobTimeout = null)
     {
         var catalog = new FakeCatalog();
         var runner = new FakeRunner();
@@ -81,7 +94,7 @@ public sealed class SoftwareJobServiceTests
         services.AddSingleton<IAuditService>(audit);
         var sp = services.BuildServiceProvider();
         var scopeFactory = sp.GetRequiredService<IServiceScopeFactory>();
-        var svc = new SoftwareJobService(scopeFactory, runner, NullLogger<SoftwareJobService>.Instance, time);
+        var svc = new SoftwareJobService(scopeFactory, runner, NullLogger<SoftwareJobService>.Instance, time, jobTimeout);
 
         return (svc, catalog, runner, audit, time);
     }
@@ -111,6 +124,63 @@ public sealed class SoftwareJobServiceTests
             e.Action == "software.app.uninstall" &&
             e.Target == "reg:App1" &&
             e.Success);
+    }
+
+    [Fact]
+    public async Task SucceededStatus_IsVisibleOnlyAfterAuditWriteCompletes()
+    {
+        var (svc, catalog, runner, audit, _) = Create();
+        catalog.Apps.Add(new InstalledApp
+        {
+            Id = "reg:App1",
+            Name = "App1",
+            Source = "Registry",
+            CanUninstall = true,
+            UninstallString = "cmd.exe /c exit 0",
+        });
+        runner.Gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        audit.Gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var job = svc.StartUninstallApp("reg:App1");
+        runner.Gate.SetResult();
+        await audit.WriteStarted.Task.WaitAsync(TimeSpan.FromSeconds(1));
+
+        var visible = Assert.IsType<SoftwareJob>(svc.GetJob(job.Id));
+        Assert.NotEqual(SoftwareJobStatus.Succeeded, visible.Status);
+
+        audit.Gate.SetResult();
+        await WaitFor(svc, job.Id, SoftwareJobStatus.Succeeded);
+        Assert.Single(audit.Entries);
+    }
+
+    [Fact]
+    public async Task Timeout_FailsCancelsRunnerAndAllowsSecondStartOnlyAfterFinished()
+    {
+        var (svc, catalog, runner, _, _) = Create(TimeSpan.FromMilliseconds(50));
+        catalog.Apps.Add(new InstalledApp
+        {
+            Id = "reg:App1",
+            Name = "App1",
+            Source = "Registry",
+            CanUninstall = true,
+            UninstallString = "cmd.exe /c exit 0",
+        });
+        runner.Gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var first = svc.StartUninstallApp("reg:App1");
+        await WaitFor(svc, first.Id, SoftwareJobStatus.Running);
+        var conflict = Assert.Throws<SoftwareConflictException>(() => svc.StartUninstallApp("reg:App1"));
+        Assert.Equal(first.Id, conflict.ActiveJobId);
+
+        var failed = await WaitFor(svc, first.Id, SoftwareJobStatus.Failed);
+        Assert.Contains("тайм-аут", failed.StatusMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("тайм-аут", failed.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.True(runner.CancellationObserved);
+
+        runner.Gate = null;
+        var second = svc.StartUninstallApp("reg:App1");
+        Assert.NotEqual(first.Id, second.Id);
+        await WaitFor(svc, second.Id, SoftwareJobStatus.Succeeded);
     }
 
     [Fact]

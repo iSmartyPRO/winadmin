@@ -18,7 +18,16 @@ public sealed class SoftwareProcessRunner : ISoftwareProcessRunner
         };
 
         process.Start();
-        await process.WaitForExitAsync(ct);
+        try
+        {
+            await process.WaitForExitAsync(ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            KillProcessTree(process);
+            throw;
+        }
+
         return process.ExitCode;
     }
 
@@ -47,9 +56,24 @@ public sealed class SoftwareProcessRunner : ISoftwareProcessRunner
         var type = operation.GetType();
         var statusProperty = type.GetProperty("Status");
         var errorCodeProperty = type.GetProperty("ErrorCode");
+        var cancelMethod = type.GetMethod("Cancel", Type.EmptyTypes);
 
         if (statusProperty == null)
             return;
+
+        using var cancellationRegistration = cancelMethod == null
+            ? default
+            : ct.Register(() =>
+            {
+                try
+                {
+                    cancelMethod.Invoke(operation, null);
+                }
+                catch
+                {
+                    // Cancellation is best-effort for WinRT async operations.
+                }
+            });
 
         while (Convert.ToInt32(statusProperty.GetValue(operation)) == 0)
             await Task.Delay(TimeSpan.FromMilliseconds(250), ct);
@@ -59,5 +83,21 @@ public sealed class SoftwareProcessRunner : ISoftwareProcessRunner
             throw ex;
         if (status == 2)
             throw new OperationCanceledException("AppX package removal was canceled.", ct);
+    }
+
+    private static void KillProcessTree(Process process)
+    {
+        try
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+                process.WaitForExit();
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            // The process may exit between HasExited and Kill/WaitForExit.
+        }
     }
 }

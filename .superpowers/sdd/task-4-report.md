@@ -35,3 +35,18 @@
 ## Concerns
 - Test output still reports existing `NU1903` warnings for vulnerable `SQLitePCLRaw.lib.e_sqlite3` 2.1.11. This task did not change package versions.
 - `SoftwareProcessRunner.RemoveStorePackageAsync` uses reflection to avoid adding a Windows SDK dependency; it follows the existing catalog-service pattern.
+
+## Task 4 Review Fixes
+- Fixed timeout handling so process jobs receive cancellation from the injectable job timeout and `SoftwareProcessRunner` kills the spawned process tree before returning cancellation.
+- Added best-effort cancellation for Store package WinRT operations by invoking `Cancel` when available.
+- Moved audit writes before final `Succeeded`/`Failed` status transitions so observing a terminal job state implies the audit write has already completed or been attempted.
+- Added regression coverage for short timeout behavior, runner cancellation, conflict while active, second start after timeout completion, and audit-before-terminal-status ordering.
+
+## Task 4 Review Verification
+- RED focused: `dotnet test src/tests/WinAdmin.Tests/WinAdmin.Tests.csproj --filter FullyQualifiedName~SoftwareJobServiceTests`
+  - Failed as expected with `CS1729` because `SoftwareJobService` did not yet accept the injectable timeout used by the new regression test.
+- GREEN focused: `dotnet test src/tests/WinAdmin.Tests/WinAdmin.Tests.csproj --filter FullyQualifiedName~SoftwareJobServiceTests`
+  - Passed: 12/12.
+- GREEN full: `dotnet test src/tests/WinAdmin.Tests/WinAdmin.Tests.csproj`
+  - Passed: 92/92.
+- Test output still reports the existing `NU1903` warning for `SQLitePCLRaw.lib.e_sqlite3` 2.1.11.
