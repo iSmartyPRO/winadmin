@@ -35,7 +35,8 @@ public sealed class EventLogsController : WinAdminControllerBase
         [FromQuery] string? eventIds = null,
         [FromQuery] string? levels = null,
         [FromQuery] string? keyword = null,
-        [FromQuery] string? user = null)
+        [FromQuery] string? user = null,
+        [FromQuery] bool excludeSystemAccounts = false)
     {
         if (string.IsNullOrWhiteSpace(logName))
             return BadRequest(new { message = "Не указан журнал (logName)." });
@@ -52,6 +53,7 @@ public sealed class EventLogsController : WinAdminControllerBase
             Levels = EventLogQueryHelpers.ParseStringList(levels),
             Keyword = keyword,
             User = user,
+            ExcludeSystemAccounts = excludeSystemAccounts,
         };
 
         try

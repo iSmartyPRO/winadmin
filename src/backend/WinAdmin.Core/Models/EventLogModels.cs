@@ -26,6 +26,7 @@ public sealed record EventLogQueryRequest
     public IReadOnlyList<string>? Levels { get; init; }
     public string? Keyword { get; init; }
     public string? User { get; init; }
+    public bool ExcludeSystemAccounts { get; init; }
 }
 
 /// <summary>Результат запроса журнала: записи + признак усечения по лимиту/сканированию.</summary>

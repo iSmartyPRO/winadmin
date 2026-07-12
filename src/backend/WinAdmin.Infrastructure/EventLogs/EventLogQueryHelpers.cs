@@ -11,11 +11,6 @@ public static class EventLogQueryHelpers
 {
     private static readonly XNamespace EventNs = "http://schemas.microsoft.com/win/2004/08/events/event";
 
-    private static readonly string[] UserNameFieldPriority =
-    {
-        "TargetUserName", "SubjectUserName", "AccountName",
-    };
-
     public static string BuildXPathFilter(EventLogQueryRequest request)
     {
         var conditions = new List<string>
@@ -49,37 +44,6 @@ public static class EventLogQueryHelpers
         "Information" => 4,
         _ => throw new ArgumentException($"Неизвестный уровень: {level}", nameof(level)),
     };
-
-    /// <summary>
-    /// Извлекает имя учётной записи из EventData записи (TargetUserName → SubjectUserName →
-    /// AccountName, первое непустое и не "-"). Возвращает null, если запись не парсится или
-    /// ни одно из полей не заполнено — вызывающий код сам решает, использовать ли fallback на SID.
-    /// </summary>
-    public static string? ExtractUserNameFromXml(string recordXml)
-    {
-        XDocument doc;
-        try
-        {
-            doc = XDocument.Parse(recordXml);
-        }
-        catch (System.Xml.XmlException)
-        {
-            return null;
-        }
-
-        var dataElements = doc.Descendants(EventNs + "Data").ToList();
-
-        foreach (var fieldName in UserNameFieldPriority)
-        {
-            var value = dataElements
-                .FirstOrDefault(d => (string?)d.Attribute("Name") == fieldName)
-                ?.Value;
-            if (!string.IsNullOrWhiteSpace(value) && value != "-")
-                return value;
-        }
-
-        return null;
-    }
 
     private static readonly (string NameField, string? SidField)[] UserFieldPriority =
     {
