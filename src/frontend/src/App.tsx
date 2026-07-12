@@ -17,6 +17,7 @@ import Users from './pages/Users'
 import Settings from './pages/Settings'
 import EventLogs from './pages/EventLogs'
 import Applications from './pages/Applications'
+import Updates from './pages/Updates'
 
 export default function App() {
   const [authed, setAuthed] = useState(() => Boolean(getStoredToken()))
@@ -45,6 +46,7 @@ export default function App() {
           <Route path="/printers" element={<Printers />} />
           <Route path="/power" element={<Power />} />
           <Route path="/software/apps" element={<Applications />} />
+          <Route path="/software/updates" element={<Updates />} />
           <Route path="/logs/:presetKey" element={<EventLogs />} />
           <Route path="/cp/apikeys" element={<ApiKeys />} />
           <Route path="/cp/audit" element={<AuditLog />} />
