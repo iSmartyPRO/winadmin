@@ -3,7 +3,7 @@ import {
   DashboardOutlined, HddOutlined, ApiOutlined, AppstoreOutlined,
   PrinterOutlined, PoweroffOutlined, KeyOutlined, FileSearchOutlined,
   BookOutlined, LogoutOutlined, DesktopOutlined, TeamOutlined,
-  FileTextOutlined, SettingOutlined,
+  FileTextOutlined, SettingOutlined, CodeOutlined,
 } from '@ant-design/icons'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
@@ -24,6 +24,13 @@ export default function AppLayout({ machine }: { machine?: string; onLogout: () 
     { key: '/disks', icon: <HddOutlined />, label: 'Диски' },
     { key: '/services', icon: <ApiOutlined />, label: 'Службы' },
     { key: '/processes', icon: <AppstoreOutlined />, label: 'Процессы' },
+    {
+      key: '/software', icon: <CodeOutlined />, label: 'Software',
+      children: [
+        { key: '/software/apps', label: 'Applications' },
+        { key: '/software/updates', label: 'Updates' },
+      ],
+    },
     { key: '/printers', icon: <PrinterOutlined />, label: 'Принтеры' },
     { key: '/power', icon: <PoweroffOutlined />, label: 'Питание' },
     {
@@ -64,7 +71,7 @@ export default function AppLayout({ machine }: { machine?: string; onLogout: () 
           theme="dark"
           mode="inline"
           selectedKeys={[location.pathname]}
-          defaultOpenKeys={['/logs']}
+          defaultOpenKeys={location.pathname.startsWith('/software') ? ['/logs', '/software'] : ['/logs']}
           items={items}
           onClick={({ key }) => navigate(key)}
           style={{ background: 'transparent', borderInlineEnd: 'none' }}
