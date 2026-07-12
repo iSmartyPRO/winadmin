@@ -84,7 +84,11 @@ function EventLogsView({ presetKey }: { presetKey?: string }) {
       // Скрываем фоновый шум (сетевые 3, служебные 5), кроме поиска по конкретному пользователю.
       excludeLogonTypes: isAuthPreset && hideNoise && !user.trim() ? '3,5' : undefined,
     })
-  })
+    // immediate=false: не грузим журнал при открытии страницы — только по кнопке/фильтрам.
+  }, undefined, false)
+
+  // Данные ещё ни разу не запрашивались (нет результата и не идёт загрузка).
+  const notLoadedYet = data === undefined && !loading
 
   // Автозапрос при выборе журнала в кастомном режиме (смена пресета уже
   // обрабатывается ремонтом всего компонента по ключу presetKey, поэтому
@@ -288,6 +292,13 @@ function EventLogsView({ presetKey }: { presetKey?: string }) {
           columns={columns}
           dataSource={tableData}
           loading={loading}
+          locale={{
+            emptyText: notLoadedYet
+              ? (isCustom && !logName
+                  ? 'Выберите журнал и нажмите «Применить»'
+                  : 'Задайте фильтры и нажмите «Применить», чтобы загрузить записи')
+              : undefined,
+          }}
           pagination={{ pageSize: 25, showSizeChanger: true }}
           onRow={(record) => ({
             onClick: () => {

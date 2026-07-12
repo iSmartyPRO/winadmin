@@ -6,9 +6,13 @@ interface State<T> {
   error?: string
 }
 
-/** Загружает данные и опционально перезапрашивает с интервалом (polling). */
-export function useApi<T>(fetcher: () => Promise<T>, pollMs?: number) {
-  const [state, setState] = useState<State<T>>({ loading: true })
+/**
+ * Загружает данные и опционально перезапрашивает с интервалом (polling).
+ * immediate=false — не грузить при монтировании (ждём ручной refresh); polling
+ * при этом не запускается до первого вызова.
+ */
+export function useApi<T>(fetcher: () => Promise<T>, pollMs?: number, immediate = true) {
+  const [state, setState] = useState<State<T>>({ loading: immediate })
   const fetcherRef = useRef(fetcher)
   fetcherRef.current = fetcher
 
@@ -24,11 +28,12 @@ export function useApi<T>(fetcher: () => Promise<T>, pollMs?: number) {
   }, [])
 
   useEffect(() => {
+    if (!immediate) return
     refresh()
     if (!pollMs) return
     const id = setInterval(() => refresh(true), pollMs)
     return () => clearInterval(id)
-  }, [refresh, pollMs])
+  }, [refresh, pollMs, immediate])
 
   return { ...state, refresh }
 }
