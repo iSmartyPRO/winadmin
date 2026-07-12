@@ -10,8 +10,10 @@ Self-contained пакет для **Windows Server 2019** (и новее), **x64*
 | `WinAdmin.Api.exe` | Основное приложение (API + веб-интерфейс) |
 | `wwwroot/` | Собранный фронтенд |
 | `install-service.ps1` | Установка как службы Windows |
+| `download-release.ps1` | Скачать релиз с GitHub |
+| `update-release.ps1` | Обновить установку с GitHub |
 | `web.config` | Для размещения под IIS (опционально) |
-| `docs/` | Краткая справка по журналам и безопасности |
+| `docs/` | Справка: журналы, безопасность, **установка с GitHub** |
 
 После первого запуска рядом появятся:
 
@@ -27,6 +29,8 @@ Self-contained пакет для **Windows Server 2019** (и новее), **x64*
    C:\WinAdmin\
    ```
 2. Убедитесь, что на сервере **Windows x64** (не 32-bit).
+
+Установка с GitHub без ручного скачивания ZIP: см. **`docs/github-releases.md`**.
 
 ---
 

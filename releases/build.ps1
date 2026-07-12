@@ -57,7 +57,10 @@ $PackageDir = "$PSScriptRoot\package"
 if (Test-Path $PackageDir) {
     Copy-Item "$PackageDir\*" $OutputPath -Recurse -Force
     Copy-Item "$PSScriptRoot\install-service.ps1" $OutputPath -Force
-    Ok "README, docs, install-service.ps1 → $OutputPath"
+    Copy-Item "$PSScriptRoot\download-release.ps1" $OutputPath -Force
+    Copy-Item "$PSScriptRoot\update-release.ps1" $OutputPath -Force
+    Copy-Item "$PSScriptRoot\install-from-github.ps1" $OutputPath -Force
+    Ok "README, docs, scripts -> $OutputPath"
 }
 
 # ── 4. Итог ───────────────────────────────────────────────────────────────────

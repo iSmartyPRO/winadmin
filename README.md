@@ -49,25 +49,45 @@ npm --prefix src/frontend run dev        # http://localhost:5188
 
 ## Скачать готовый релиз
 
-Готовый ZIP (~150 МБ, self-contained, Windows x64) публикуется в **GitHub Releases**:
-
+Готовый ZIP (~150 МБ, self-contained, Windows x64):  
 **https://github.com/iSmartyPRO/winadmin/releases**
 
-1. Скачайте `WinAdmin-x.y.z-win-x64.zip`
-2. Распакуйте на сервер, например в `C:\WinAdmin\`
-3. Запустите (от администратора):
+Полная инструкция для конечных компьютеров (скрипты + copy-paste):  
+**[releases/package/docs/github-releases.md](releases/package/docs/github-releases.md)**
+
+### Быстрая установка на сервере
+
+PowerShell **от имени администратора**:
+
+```powershell
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+$dir = "$env:TEMP\winadmin-scripts"
+New-Item -ItemType Directory -Force -Path $dir | Out-Null
+$base = 'https://raw.githubusercontent.com/iSmartyPRO/winadmin/main/releases'
+Invoke-WebRequest "$base/download-release.ps1" -OutFile "$dir\download-release.ps1" -UseBasicParsing
+Invoke-WebRequest "$base/install-from-github.ps1" -OutFile "$dir\install-from-github.ps1" -UseBasicParsing
+& "$dir\install-from-github.ps1" -Port 8080
+```
+
+Создать пользователя:
 
 ```powershell
 cd C:\WinAdmin
-.\install-service.ps1 -Port 8080
 .\WinAdmin.Api.exe user add --login admin --password "YourPassword" --scopes admin
 ```
 
-Новый релиз создаётся автоматически при пуше тега:
+### Обновление
 
 ```powershell
-git tag v1.0.0
-git push origin v1.0.0
+cd C:\WinAdmin
+.\update-release.ps1 -Port 8080
+```
+
+### Публикация нового релиза (разработчик)
+
+```powershell
+git tag v1.0.1
+git push origin v1.0.1
 ```
 
 См. также [releases/README.md](releases/README.md).
