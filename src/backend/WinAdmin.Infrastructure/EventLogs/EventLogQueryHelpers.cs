@@ -81,6 +81,64 @@ public static class EventLogQueryHelpers
         return null;
     }
 
+    private static readonly (string NameField, string? SidField)[] UserFieldPriority =
+    {
+        ("TargetUserName", "TargetUserSid"),
+        ("SubjectUserName", "SubjectUserSid"),
+        ("AccountName", null),
+    };
+
+    private const string SidSystem = "S-1-5-18";
+    private const string SidLocalService = "S-1-5-19";
+    private const string SidNetworkService = "S-1-5-20";
+
+    /// <summary>
+    /// Извлекает (имя, SID) учётной записи из EventData записи, перебирая пары полей
+    /// TargetUserName/TargetUserSid → SubjectUserName/SubjectUserSid → AccountName (без SID).
+    /// Останавливается на первом непустом и не "-" имени; SID берётся из парного поля той же
+    /// записи, если для этого приоритета оно объявлено.
+    /// </summary>
+    public static (string? Name, string? Sid) ExtractUserInfo(string recordXml)
+    {
+        XDocument doc;
+        try
+        {
+            doc = XDocument.Parse(recordXml);
+        }
+        catch (System.Xml.XmlException)
+        {
+            return (null, null);
+        }
+
+        var dataElements = doc.Descendants(EventNs + "Data").ToList();
+
+        string? FieldValue(string fieldName) =>
+            dataElements.FirstOrDefault(d => (string?)d.Attribute("Name") == fieldName)?.Value;
+
+        foreach (var (nameField, sidField) in UserFieldPriority)
+        {
+            var name = FieldValue(nameField);
+            if (string.IsNullOrWhiteSpace(name) || name == "-") continue;
+            var sid = sidField != null ? FieldValue(sidField) : null;
+            return (name, string.IsNullOrWhiteSpace(sid) ? null : sid);
+        }
+
+        return (null, null);
+    }
+
+    /// <summary>
+    /// Определяет встроенную системную учётную запись по SID (языконезависимо — SID не
+    /// переводится): SYSTEM/LOCAL SERVICE/NETWORK SERVICE, либо по суффиксу "$" в имени
+    /// (машинный аккаунт — соглашение именования NetBIOS, тоже не зависит от языка). Если SID
+    /// недоступен и имя не оканчивается на "$", запись не считается системной — по
+    /// локализованному имени не гадаем.
+    /// </summary>
+    public static bool IsSystemAccount(string? sid, string? name)
+    {
+        if (sid is SidSystem or SidLocalService or SidNetworkService) return true;
+        return name is not null && name.EndsWith('$');
+    }
+
     public static bool MatchesSubstring(string? haystack, string? needle) =>
         string.IsNullOrEmpty(needle) || (haystack?.Contains(needle, StringComparison.OrdinalIgnoreCase) ?? false);
 

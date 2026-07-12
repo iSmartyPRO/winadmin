@@ -137,6 +137,110 @@ public sealed class EventLogQueryHelpersTests
         Assert.Null(EventLogQueryHelpers.ExtractUserNameFromXml("<Event><Unclosed>"));
     }
 
+    [Fact]
+    public void ExtractUserInfo_ReturnsTargetUserNameAndItsSid()
+    {
+        const string xml = """
+            <Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'>
+              <System><EventID>4624</EventID></System>
+              <EventData>
+                <Data Name='SubjectUserName'>WIN-SRV$</Data>
+                <Data Name='SubjectUserSid'>S-1-5-18</Data>
+                <Data Name='TargetUserName'>ivan.petrov</Data>
+                <Data Name='TargetUserSid'>S-1-5-21-1-2-3-1001</Data>
+              </EventData>
+            </Event>
+            """;
+
+        var (name, sid) = EventLogQueryHelpers.ExtractUserInfo(xml);
+
+        Assert.Equal("ivan.petrov", name);
+        Assert.Equal("S-1-5-21-1-2-3-1001", sid);
+    }
+
+    [Fact]
+    public void ExtractUserInfo_FallsBackToSubjectUserName_WithItsOwnSid_WhenTargetIsDash()
+    {
+        const string xml = """
+            <Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'>
+              <System><EventID>4625</EventID></System>
+              <EventData>
+                <Data Name='SubjectUserName'>SYSTEM</Data>
+                <Data Name='SubjectUserSid'>S-1-5-18</Data>
+                <Data Name='TargetUserName'>-</Data>
+              </EventData>
+            </Event>
+            """;
+
+        var (name, sid) = EventLogQueryHelpers.ExtractUserInfo(xml);
+
+        Assert.Equal("SYSTEM", name);
+        Assert.Equal("S-1-5-18", sid);
+    }
+
+    [Fact]
+    public void ExtractUserInfo_FallsBackToAccountName_WithNullSid()
+    {
+        const string xml = """
+            <Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'>
+              <System><EventID>1</EventID></System>
+              <EventData>
+                <Data Name='AccountName'>admin</Data>
+              </EventData>
+            </Event>
+            """;
+
+        var (name, sid) = EventLogQueryHelpers.ExtractUserInfo(xml);
+
+        Assert.Equal("admin", name);
+        Assert.Null(sid);
+    }
+
+    [Fact]
+    public void ExtractUserInfo_ReturnsNulls_WhenNoMatchingFields()
+    {
+        const string xml = """
+            <Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'>
+              <System><EventID>7036</EventID></System>
+              <EventData>
+                <Data Name='param1'>Print Spooler</Data>
+                <Data Name='param2'>running</Data>
+              </EventData>
+            </Event>
+            """;
+
+        var (name, sid) = EventLogQueryHelpers.ExtractUserInfo(xml);
+
+        Assert.Null(name);
+        Assert.Null(sid);
+    }
+
+    [Fact]
+    public void ExtractUserInfo_ReturnsNulls_OnMalformedXml()
+    {
+        var (name, sid) = EventLogQueryHelpers.ExtractUserInfo("<Event><Unclosed>");
+
+        Assert.Null(name);
+        Assert.Null(sid);
+    }
+
+    [Theory]
+    [InlineData("S-1-5-18", "SYSTEM", true)]
+    [InlineData("S-1-5-18", "СИСТЕМА", true)]
+    [InlineData("S-1-5-19", "Local Service", true)]
+    [InlineData("S-1-5-20", null, true)]
+    [InlineData(null, "DESKTOP-01$", true)]
+    [InlineData(null, "DOMAIN\\PC$", true)]
+    [InlineData(null, null, false)]
+    [InlineData(null, "", false)]
+    [InlineData(null, "Administrator", false)]
+    [InlineData(null, "ivanov", false)]
+    [InlineData("S-1-5-21-1-2-3-1001", "ivanov", false)]
+    public void IsSystemAccount_Cases(string? sid, string? name, bool expected)
+    {
+        Assert.Equal(expected, EventLogQueryHelpers.IsSystemAccount(sid, name));
+    }
+
     [Theory]
     [InlineData("hello world", null, true)]
     [InlineData("hello world", "", true)]
