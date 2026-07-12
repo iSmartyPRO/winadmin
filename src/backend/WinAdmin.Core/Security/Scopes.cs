@@ -16,6 +16,8 @@ public static class Scopes
     public const string PrintersManage = "printers.manage";
     public const string PowerManage = "power.manage";
     public const string EventLogsRead = "eventlogs.read";
+    public const string SoftwareRead = "software.read";
+    public const string SoftwareManage = "software.manage";
 
     /// <summary>Управление API-ключами и просмотр аудита.</summary>
     public const string Admin = "admin";
@@ -27,7 +29,7 @@ public static class Scopes
         ServicesRead, ServicesManage,
         ProcessesRead, ProcessesManage,
         PrintersRead, PrintersManage,
-        PowerManage, EventLogsRead, Admin,
+        PowerManage, EventLogsRead, SoftwareRead, SoftwareManage, Admin,
     };
 
     public static bool IsValid(string scope) => All.Contains(scope);

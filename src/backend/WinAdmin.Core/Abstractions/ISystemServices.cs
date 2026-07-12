@@ -43,3 +43,20 @@ public interface IEventLogService
     IReadOnlyList<string> GetLogNames();
     EventLogQueryResult Query(EventLogQueryRequest request);
 }
+
+public interface ISoftwareCatalogService
+{
+    IReadOnlyList<InstalledApp> GetApplications();
+    IReadOnlyList<InstalledUpdate> GetUpdates();
+    InstalledApp? FindApplication(string id);
+    InstalledUpdate? FindUpdate(string id);
+}
+
+public interface ISoftwareJobService
+{
+    SoftwareJob StartUninstallApp(string appId);
+    SoftwareJob StartUninstallUpdate(string updateId);
+    SoftwareJob StartRollbackUpdate(string updateId);
+    SoftwareJob? GetJob(string jobId);
+    SoftwareJob? GetActiveJob();
+}
