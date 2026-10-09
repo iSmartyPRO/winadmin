@@ -5,14 +5,14 @@
 Интерактивная спецификация: `/swagger`, машиночитаемая: `/swagger/v1/swagger.json`.
 
 Коды ответов: `200` OK · `201` создано · `202` принято (фоновая операция) · `204` нет содержимого ·
-`400` неверный запрос · `401` нет/неверный ключ · `403` нет нужного scope · `404` не найдено ·
+`400` неверный запрос · `401` нет/неверный ключ · `403` нет нужного права · `404` не найдено ·
 `409` действие не выполнено · `429` лимит запросов.
 
 ---
 
 ## Система
 
-### `GET /system` — scope `system.read`
+### `GET /system` — право `system.read`
 Сводная информация о машине.
 
 ```json
@@ -28,7 +28,7 @@
 }
 ```
 
-### `GET /system/metrics` — scope `system.read`
+### `GET /system/metrics` — право `system.read`
 Мгновенные метрики.
 
 ```json
@@ -39,7 +39,7 @@
 
 ## Диски
 
-### `GET /disks` — scope `disks.read`
+### `GET /disks` — право `system.read`
 Физические диски с томами.
 
 ```json
@@ -52,13 +52,13 @@
 
 ## Службы
 
-### `GET /services` — scope `services.read`
+### `GET /services` — право `services.read`
 ```json
 [ { "name": "Spooler", "displayName": "Диспетчер печати", "status": "Running",
     "startType": "Auto", "canStop": true, "canPauseAndContinue": false, "account": "LocalSystem" } ]
 ```
 
-### `POST /services/{name}/{action}` — scope `services.manage`
+### `POST /services/{name}/{action}` — право `services.manage`
 `action` ∈ `start` | `stop` | `restart`. Ответ: `OperationResult` (`200` или `409`).
 
 ```json
@@ -67,36 +67,36 @@
 
 ## Процессы
 
-### `GET /processes` — scope `processes.read`
+### `GET /processes` — право `processes.read`
 ```json
 [ { "pid": 1234, "name": "chrome", "mainWindowTitle": "...", "workingSetBytes": 650000000,
     "threadCount": 42, "startTime": "...", "hasWindow": true } ]
 ```
 
-### `DELETE /processes/{pid}` — scope `processes.manage`
+### `DELETE /processes/{pid}` — право `processes.manage`
 Завершает процесс (с дочерним деревом). Ответ: `OperationResult`.
 
 ## Принтеры
 
-### `GET /printers` — scope `printers.read`
+### `GET /printers` — право `printers.read`
 ```json
 [ { "name": "HP M428", "portName": "192.168.1.50", "driverName": "HP ...",
     "isDefault": true, "isShared": false, "workOffline": false, "status": "Idle", "queuedJobs": 0 } ]
 ```
 
-### `POST /printers/{name}/{action}` — scope `printers.manage`
+### `POST /printers/{name}/{action}` — право `printers.manage`
 `action` ∈ `pause` | `resume` | `purge`. Ответ: `OperationResult`.
 
 ## Питание
 
-### `POST /power/reboot` · `POST /power/shutdown` — scope `power.manage`
+### `POST /power/reboot` · `POST /power/shutdown` — право `power.manage`
 Тело (опционально):
 
 ```json
 { "delaySeconds": 30, "comment": "Плановое обслуживание", "force": false }
 ```
 
-### `POST /power/cancel` — scope `power.manage`
+### `POST /power/cancel` — право `power.manage`
 Отменяет запланированное действие. Ответ: `OperationResult`.
 
 ## Software
@@ -116,7 +116,7 @@
 { "message": "Уже выполняется операция удаления", "activeJobId": "a1b2c3" }
 ```
 
-### `GET /software/applications` — scope `software.read`
+### `GET /software/applications` — право `software.read`
 Список установленных приложений.
 
 ```json
@@ -134,12 +134,12 @@
 `source`: `Registry` | `Store`. Поле `isSystem` — системные/фреймворковые пакеты
 (по умолчанию скрываются в UI). `canUninstall` — доступно ли удаление.
 
-### `POST /software/applications/{id}/uninstall` — scope `software.manage`
+### `POST /software/applications/{id}/uninstall` — право `software.manage`
 Запускает удаление приложения. `{id}` — prefixed id (`reg:…` или `store:…`), URL-encoded.
 Ответ `202` + `SoftwareJob`. Неизвестный id → `404`; нельзя удалить → `400`;
 активный job уже есть → `409` (см. тело выше).
 
-### `GET /software/updates` — scope `software.read`
+### `GET /software/updates` — право `software.read`
 Список установленных обновлений Windows.
 
 ```json
@@ -148,15 +148,15 @@
     "canUninstall": true, "canRollback": false } ]
 ```
 
-### `POST /software/updates/{id}/uninstall` — scope `software.manage`
+### `POST /software/updates/{id}/uninstall` — право `software.manage`
 Удаление обновления. `{id}` — prefixed id (`upd:KB…`), URL-encoded.
 Ответ `202` + `SoftwareJob`. Ошибки — как у applications.
 
-### `POST /software/updates/{id}/rollback` — scope `software.manage`
+### `POST /software/updates/{id}/rollback` — право `software.manage`
 Откат обновления (только если `canRollback=true`). `{id}` — prefixed id (`upd:KB…`), URL-encoded.
 Ответ `202` + `SoftwareJob`.
 
-### `GET /software/jobs/{jobId}` — scope `software.manage`
+### `GET /software/jobs/{jobId}` — право `software.manage`
 Текущий статус job (polling ~1 с из UI).
 
 ```json
@@ -171,13 +171,13 @@
 `progressPercent` — `0`–`100` или `null` (неопределённый прогресс).
 Job не найден → `404`.
 
-### `GET /software/jobs/active` — scope `software.manage`
+### `GET /software/jobs/active` — право `software.manage`
 Текущий активный job (`Queued`/`Running`) или `204 No Content`, если операций нет.
 Используется UI для восстановления drawer после перезагрузки страницы.
 
 ## Администрирование
 
-### `GET /apikeys` · `GET /apikeys/scopes` · `POST /apikeys` · `DELETE /apikeys/{id}` — scope `admin`
+### `GET /apikeys` · `GET /apikeys/scopes` · `POST /apikeys` · `DELETE /apikeys/{id}` — роль «Администратор» или соответствующее право `platform.*`
 Создание:
 
 ```json
@@ -188,7 +188,7 @@ Job не найден → `404`.
   "plaintextKey": "sp_..." }   // показывается один раз
 ```
 
-### `GET /audit?limit=200&actor=<имя>` — scope `admin`
+### `GET /audit?limit=200&actor=<имя>` — роль «Администратор» или соответствующее право `platform.*`
 Записи журнала аудита (по убыванию времени).
 
 ## Служебное

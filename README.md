@@ -11,7 +11,7 @@
 - Live-метрики CPU/память/сеть
 - Управление: службы, процессы, принтеры, питание
 - Software: установленные приложения и обновления Windows, удаление с прогрессом
-- REST API с ключами и гранулярными scopes, аудит действий
+- REST API с ключами, роли с правами по модулям и делегированием, аудит действий
 - Swagger + гайды интеграции
 
 ## Стек
@@ -76,7 +76,7 @@ Invoke-WebRequest "$base/install-from-github.ps1" -OutFile "$dir\install-from-gi
 
 ```powershell
 cd C:\apps\WinAdmin
-.\WinAdmin.exe user add --login admin --password "YourPassword" --scopes admin
+.\WinAdmin.exe user add --login admin --password "YourPassword" --role Администратор
 ```
 
 ### Обновление
@@ -215,7 +215,7 @@ wevtutil sl Security /rt:false
 
 - [docs/00-overview.md](docs/00-overview.md) — обзор и архитектура
 - [docs/01-deploy-iis.md](docs/01-deploy-iis.md) — установка под IIS
-- [docs/02-security.md](docs/02-security.md) — ключи, scopes, аудит
+- [docs/02-security.md](docs/02-security.md) — ключи, роли и права, аудит
 - [docs/03-api-reference.md](docs/03-api-reference.md) — справочник API
 - [docs/04-integration-guides.md](docs/04-integration-guides.md) — примеры интеграции
 - [docs/05-troubleshooting.md](docs/05-troubleshooting.md) — диагностика

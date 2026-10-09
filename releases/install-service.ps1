@@ -105,4 +105,4 @@ Write-Host "  .\WinAdmin.exe network set --mode network --allow 10.0.0.0/24" -Fo
 Write-Host ""
 Write-Host "Create the first user (if none yet):" -ForegroundColor Yellow
 Write-Host "  cd `"$InstallPath`"" -ForegroundColor Yellow
-Write-Host '  .\WinAdmin.exe user add --login admin --password "YourPassword" --scopes admin' -ForegroundColor Yellow
+Write-Host '  .\WinAdmin.exe user add --login admin --password "YourPassword" --role Администратор' -ForegroundColor Yellow

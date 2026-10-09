@@ -4,7 +4,7 @@
 
 1. Создайте пользователя (один раз):
    ```powershell
-   .\WinAdmin.exe user add --login admin --password "<пароль>" --scopes admin
+   .\WinAdmin.exe user add --login admin --password "<пароль>" --role Администратор
    ```
 2. Войдите на странице логина логином и паролем.
 
@@ -29,18 +29,19 @@
 [Environment]::SetEnvironmentVariable("WinAdmin__Jwt__Secret", "<длинная-случайная-строка>", "Machine")
 ```
 
-## Scopes (для API-ключей и пользователей)
+## Права (выдаются ролями)
 
 | Scope | Доступ |
 |---|---|
-| `system.read` | Система, метрики |
-| `disks.read` | Диски |
+| `system.read` | Система, метрики, диски |
 | `services.read` / `services.manage` | Службы |
 | `processes.read` / `processes.manage` | Процессы |
 | `printers.read` / `printers.manage` | Принтеры |
 | `power.manage` | Перезагрузка/выключение |
 | `eventlogs.read` | Журналы Windows |
-| `admin` | Всё + ключи, пользователи, аудит |
+| `eventlogs.manage` | Исключения учётных записей в журналах |
+| `platform.*` | Пользователи, роли, модули, API-ключи, аудит, сеть, подключение к домену |
+| роль «Администратор» | Все права, включая права будущих модулей |
 
 ## Аудит
 
