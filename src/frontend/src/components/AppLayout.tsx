@@ -3,7 +3,7 @@ import {
   DashboardOutlined, HddOutlined, ApiOutlined, AppstoreOutlined,
   PrinterOutlined, PoweroffOutlined, KeyOutlined, FileSearchOutlined,
   BookOutlined, LogoutOutlined, DesktopOutlined, TeamOutlined,
-  FileTextOutlined, SettingOutlined, CodeOutlined, SafetyCertificateOutlined, AppstoreAddOutlined, SafetyOutlined,
+  FileTextOutlined, SettingOutlined, CodeOutlined, SafetyCertificateOutlined, AppstoreAddOutlined, SafetyOutlined, IdcardOutlined,
 } from '@ant-design/icons'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import type { ReactNode } from 'react'
@@ -69,6 +69,7 @@ export default function AppLayout({ machine }: { machine?: string; onLogout: () 
         { key: '/logs/custom', label: 'Произвольный журнал' },
       ],
     },
+    { key: '/ad/users', icon: <IdcardOutlined />, label: 'Пользователи AD', perm: 'ad-users.read', module: 'ad-users' },
     { type: 'divider' },
     { key: '/cp/users', icon: <TeamOutlined />, label: 'Пользователи', perm: 'platform.users.manage' },
     { key: '/cp/roles', icon: <SafetyCertificateOutlined />, label: 'Роли', perm: 'platform.roles.manage' },

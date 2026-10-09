@@ -358,3 +358,18 @@ export type CheckStatus = 'Ok' | 'Warning' | 'Failed' | 'Skipped'
 export interface CheckResult { code: string; title: string; status: CheckStatus; message: string; fix: string | null }
 
 export interface EnvironmentReport { moduleId: string; at: string; overall: CheckStatus; results: CheckResult[] }
+
+export interface AdProject { dn: string; name: string }
+
+export interface AdUserView {
+  sam: string; dn: string; displayName: string | null; enabled: boolean
+  lastLogon: string | null; whenCreated: string | null; hasPhoto: boolean
+  projectDn: string | null; projectName: string | null; terminated: boolean
+  attributes: Record<string, string | null>
+}
+
+export interface AdGroupRef { dn: string; name: string; sid: string | null; isPrimary: boolean }
+export interface AdUserCard { user: AdUserView; groups: AdGroupRef[] }
+export interface ScenarioStep { name: string; status: 'Ok' | 'Skipped' | 'Failed'; message: string | null }
+export interface ActivationResult { steps: ScenarioStep[]; password: string | null }
+export type AdUserStatus = 'active' | 'disabled' | 'terminated' | 'all'

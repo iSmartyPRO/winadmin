@@ -11,6 +11,7 @@ import type {
   InstalledApp, InstalledUpdate, SoftwareJob,
   DirectorySettings, DirectoryTestStep, DirectoryEntry,
   AdStructureSettings, SaveAdStructure, EnvironmentReport,
+  AdProject, AdUserView, AdUserCard, AdUserStatus, ScenarioStep, ActivationResult,
 } from './types'
 
 // ── JWT storage (sessionStorage — очищается при закрытии вкладки) ──
@@ -141,6 +142,27 @@ export const api = {
     test: () => http.post<DirectoryTestStep[]>('/settings/directory/test').then((r) => r.data),
     search: (q: string, kind: 'user' | 'group') =>
       http.get<DirectoryEntry[]>('/directory/search', { params: { q, kind } }).then((r) => r.data),
+  },
+
+  ad: {
+    projects: () => http.get<AdProject[]>('/ad/projects').then((r) => r.data),
+    users: (params: { project?: string; status?: AdUserStatus; q?: string }) =>
+      http.get<AdUserView[]>('/ad/users', { params }).then((r) => r.data),
+    user: (sam: string) => http.get<AdUserCard>(`/ad/users/${encodeURIComponent(sam)}`).then((r) => r.data),
+    photo: (sam: string) => http.get(`/ad/users/${encodeURIComponent(sam)}/photo`, { responseType: 'blob' }).then((r) => r.data as Blob),
+    history: (sam: string) => http.get<AuditEntryDto[]>(`/ad/users/${encodeURIComponent(sam)}/history`).then((r) => r.data),
+    updateAttributes: (sam: string, attributes: Record<string, string | null>) =>
+      http.put<AdUserView>(`/ad/users/${encodeURIComponent(sam)}/attributes`, { attributes }).then((r) => r.data),
+    setPhoto: (sam: string, blob: Blob) =>
+      http.put(`/ad/users/${encodeURIComponent(sam)}/photo`, blob, { headers: { 'Content-Type': blob.type } }),
+    removePhoto: (sam: string) => http.delete(`/ad/users/${encodeURIComponent(sam)}/photo`),
+    move: (sam: string, projectDn: string) =>
+      http.post<AdUserView>(`/ad/users/${encodeURIComponent(sam)}/move`, { projectDn }).then((r) => r.data),
+    password: (sam: string, body: { password?: string; generate: boolean; mustChange: boolean }) =>
+      http.post<{ password: string | null }>(`/ad/users/${encodeURIComponent(sam)}/password`, body).then((r) => r.data),
+    deactivate: (sam: string) => http.post<ScenarioStep[]>(`/ad/users/${encodeURIComponent(sam)}/deactivate`).then((r) => r.data),
+    activate: (sam: string, projectDn: string) =>
+      http.post<ActivationResult>(`/ad/users/${encodeURIComponent(sam)}/activate`, { projectDn }).then((r) => r.data),
   },
 
   adStructure: {

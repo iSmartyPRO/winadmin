@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   App, Button, Card, Drawer, Empty, Form, Input, List, Popconfirm, Select, Space, Table, Tag, Tree, Typography,
 } from 'antd'
@@ -28,6 +28,11 @@ function RoleEditor({ role, groups, open, onClose, onSaved }: {
   const [scopes, setScopes] = useState<Record<string, string[]>>({})
   const [saving, setSaving] = useState(false)
   const moduleOf = (permId: string) => groups.find((g) => g.permissions.some((p) => p.id === permId))
+  const [projects, setProjects] = useState<{ value: string; label: string }[]>([])
+  const needsProjects = groups.some((g) => g.scopeTitle === 'Проекты (OU)')
+  useEffect(() => {
+    if (open && needsProjects) api.ad.projects().then((p) => setProjects(p.map((x) => ({ value: x.dn, label: x.name })))).catch(() => setProjects([]))
+  }, [open, needsProjects])
 
   const reset = () => {
     form.setFieldsValue({ name: role?.name ?? '', description: role?.description })
@@ -103,14 +108,20 @@ function RoleEditor({ role, groups, open, onClose, onSaved }: {
       {scopedGroups.map((g) => (
         <div key={g.id} style={{ marginBottom: 12 }}>
           <Text>{g.scopeTitle ?? 'Область'} — {g.title}</Text>
-          <Select
-            mode="tags"
-            open={false}
-            style={{ width: '100%', marginTop: 4 }}
-            placeholder="Пусто — без ограничений"
-            value={scopes[g.id] ?? []}
-            onChange={(v) => setScopes((s) => ({ ...s, [g.id]: v }))}
-          />
+          {g.scopeTitle === 'Проекты (OU)' ? (
+            <Select mode="multiple" allowClear style={{ width: '100%', marginTop: 4 }} placeholder="Пусто — все проекты"
+              options={projects} value={scopes[g.id] ?? []} onChange={(v) => setScopes((s) => ({ ...s, [g.id]: v }))}
+              notFoundContent="Проекты недоступны: включите модуль и задайте корневую OU" />
+          ) : (
+            <Select
+              mode="tags"
+              open={false}
+              style={{ width: '100%', marginTop: 4 }}
+              placeholder="Пусто — без ограничений"
+              value={scopes[g.id] ?? []}
+              onChange={(v) => setScopes((s) => ({ ...s, [g.id]: v }))}
+            />
+          )}
         </div>
       ))}
     </Drawer>
