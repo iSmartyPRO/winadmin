@@ -141,6 +141,33 @@ sc.exe start WinAdmin
 
 ---
 
+## 5а. База данных и ключ шифрования
+
+По умолчанию WinAdmin хранит данные в SQLite (`C:\ProgramData\WinAdmin\WinAdmin.db`). Можно перейти на PostgreSQL:
+
+```powershell
+.\WinAdmin.exe db show
+.\WinAdmin.exe db set --provider postgresql --connection "Host=db01;Database=winadmin;Username=winadmin;Password=..."
+.\WinAdmin.exe db set --provider sqlite
+Restart-Service WinAdmin
+```
+
+`db set` проверяет подключение и создаёт таблицы. Данные между базами **не переносятся**.
+Настройка хранится в `C:\ProgramData\WinAdmin\database.json`, пароль в ней зашифрован.
+
+Пароли и ключи (пароль PostgreSQL, JWT-секрет, секреты модулей) хранятся зашифрованными ключом
+`C:\ProgramData\WinAdmin\keys\master.key` (защищён DPAPI машины, доступ — только администраторы и SYSTEM).
+Без этого ключа зашифрованные значения не восстановить. Сохраните его копию:
+
+```powershell
+.\WinAdmin.exe keys export --file D:\backup\winadmin-key.bin --password "<надёжный пароль>"
+.\WinAdmin.exe keys import --file D:\backup\winadmin-key.bin --password "<пароль>"   # на новом сервере
+```
+
+`keys import` не заменяет существующий ключ без `--force`.
+
+---
+
 ## 6. Постоянные настройки (рекомендуется)
 
 Задайте **до** первого запуска или через переменные окружения машины:
@@ -149,8 +176,6 @@ sc.exe start WinAdmin
 # База данных (чтобы не лежала в папке приложения)
 [Environment]::SetEnvironmentVariable("WinAdmin__DatabasePath", "C:\ProgramData\WinAdmin\WinAdmin.db", "Machine")
 
-# JWT-секрет (иначе сессии сбросятся при каждом перезапуске)
-[Environment]::SetEnvironmentVariable("WinAdmin__Jwt__Secret", "<случайная-длинная-строка-base64>", "Machine")
 ```
 
 После изменения переменных **перезапустите** приложение или службу.
@@ -210,7 +235,7 @@ Self-contained exe можно запускать **без IIS** — это пр�
 | Мало событий за «30 дней» | Увеличить размер журнала Security (п. 7) |
 | 401 при входе | Создать пользователя (`user add`) |
 | Порт занят | `.\WinAdmin.exe network set --port 9090` |
-| Сессии сбрасываются | Задать `WinAdmin__Jwt__Secret` |
+| Сессии сбрасываются | Проверить `C:\ProgramData\WinAdmin\keys\` (ключ и `jwt.key` должны сохраняться между перезапусками) |
 | Не открывается с другой машины | Режим «Сеть» с нужной подсетью (п. 5) |
 | Панель пропала после смены порта | `.\WinAdmin.exe network show` / `network set --port 8080` из консоли администратора |
 
