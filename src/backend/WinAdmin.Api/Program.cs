@@ -15,6 +15,7 @@ using WinAdmin.Core.Models;
 using WinAdmin.Core.Network;
 using WinAdmin.Core.Security;
 using WinAdmin.Infrastructure;
+using WinAdmin.Infrastructure.Hardening;
 using WinAdmin.Infrastructure.Network;
 using WinAdmin.Infrastructure.Storage;
 
@@ -218,6 +219,7 @@ if (networkSource.Provider?.LastError is { } networkError)
 
 if (WindowsServiceHelpers.IsWindowsService())
 {
+    InstallationHardening.Apply(AppContext.BaseDirectory, dataDirectory, app.Logger);
     try
     {
         var network = app.Services.GetRequiredService<INetworkSettingsService>();
