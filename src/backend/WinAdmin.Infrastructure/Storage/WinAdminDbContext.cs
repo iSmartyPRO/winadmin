@@ -22,6 +22,8 @@ public class WinAdminDbContext : DbContext
     public DbSet<RoleEntity> Roles => Set<RoleEntity>();
     public DbSet<RolePermissionEntity> RolePermissions => Set<RolePermissionEntity>();
     public DbSet<RoleAssignmentEntity> RoleAssignments => Set<RoleAssignmentEntity>();
+    public DbSet<PlatformSettingEntity> PlatformSettings => Set<PlatformSettingEntity>();
+    public DbSet<DirectoryRefreshTokenEntity> DirectoryRefreshTokens => Set<DirectoryRefreshTokenEntity>();
 
     // SQLite не умеет ORDER BY по DateTimeOffset — храним как UTC-тики (long),
     // что сортируемо и сохраняет момент времени.
@@ -76,6 +78,25 @@ public class WinAdminDbContext : DbContext
             e.Property(x => x.CreatedAt).HasConversion(DtoConverter);
             e.HasOne(x => x.User).WithMany(x => x.RefreshTokens)
                 .HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PlatformSettingEntity>(e =>
+        {
+            e.HasKey(x => x.Key);
+            e.Property(x => x.Json).IsRequired();
+            e.Property(x => x.UpdatedAt).HasConversion(DtoConverter);
+        });
+
+        modelBuilder.Entity<DirectoryRefreshTokenEntity>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Sid).IsRequired();
+            e.Property(x => x.TokenHash).IsRequired();
+            e.HasIndex(x => x.TokenHash).IsUnique();
+            e.HasIndex(x => x.Sid);
+            e.Property(x => x.ExpiresAt).HasConversion(DtoConverter);
+            e.Property(x => x.RevokedAt).HasConversion(NullableDtoConverter);
+            e.Property(x => x.CreatedAt).HasConversion(DtoConverter);
         });
 
         modelBuilder.Entity<ExcludedUserEntity>(e =>
@@ -224,4 +245,23 @@ public sealed class RoleAssignmentEntity
     public string DisplayName { get; set; } = "";
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public string? CreatedBy { get; set; }
+}
+
+/// <summary>Настройки платформы: ключ → JSON (directory, …).</summary>
+public sealed class PlatformSettingEntity
+{
+    public string Key { get; set; } = "";
+    public string Json { get; set; } = "{}";
+    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+/// <summary>Refresh-токен пользователя AD (локальные — в RefreshTokens с FK на Users).</summary>
+public sealed class DirectoryRefreshTokenEntity
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public string Sid { get; set; } = "";
+    public string TokenHash { get; set; } = "";
+    public DateTimeOffset ExpiresAt { get; set; }
+    public DateTimeOffset? RevokedAt { get; set; }
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

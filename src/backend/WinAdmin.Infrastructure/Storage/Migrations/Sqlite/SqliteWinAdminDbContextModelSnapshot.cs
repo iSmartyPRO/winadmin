@@ -93,6 +93,38 @@ namespace WinAdmin.Infrastructure.Storage.Migrations.Sqlite
                     b.ToTable("AuditEntries");
                 });
 
+            modelBuilder.Entity("WinAdmin.Infrastructure.Storage.DirectoryRefreshTokenEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("ExpiresAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("RevokedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Sid")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Sid");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.ToTable("DirectoryRefreshTokens");
+                });
+
             modelBuilder.Entity("WinAdmin.Infrastructure.Storage.ExcludedUserEntity", b =>
                 {
                     b.Property<string>("Id")
@@ -135,6 +167,23 @@ namespace WinAdmin.Infrastructure.Storage.Migrations.Sqlite
                     b.HasKey("Id");
 
                     b.ToTable("ModuleStates");
+                });
+
+            modelBuilder.Entity("WinAdmin.Infrastructure.Storage.PlatformSettingEntity", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Json")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("UpdatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Key");
+
+                    b.ToTable("PlatformSettings");
                 });
 
             modelBuilder.Entity("WinAdmin.Infrastructure.Storage.RefreshTokenEntity", b =>

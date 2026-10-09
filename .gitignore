@@ -38,3 +38,7 @@ run.log
 
 # Временные файлы
 tmp-*
+
+# Локальные сборки пакетов для выкатки
+releases/out-*/
+releases/*-deploy/

@@ -1,3 +1,4 @@
+using WinAdmin.Infrastructure.ActiveDirectory;
 using Microsoft.Extensions.DependencyInjection;
 using WinAdmin.Core.Abstractions;
 using WinAdmin.Core.Models;
@@ -53,6 +54,7 @@ public static class DependencyInjection
         services.AddSingleton<IAccessService, AccessService>();
         services.AddScoped<IRoleService, RoleService>();
         services.AddSingleton<IMachineInfo, WmiMachineInfo>();
+        services.AddSingleton<IDirectorySettingsStore, DirectorySettingsStore>();
         services.AddSingleton<IModuleRegistry, ModuleRegistry>();
 
         return services;
