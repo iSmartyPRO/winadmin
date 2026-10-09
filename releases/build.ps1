@@ -71,7 +71,7 @@ Write-Host @"
 Перенос на целевую машину:
   1. Скопируйте папку '$OutputPath' на целевую машину
   2. Запуск без IIS (нулевые зависимости):
-       .\WinAdmin.exe --urls http://localhost:8080
+       .\WinAdmin.exe            (адрес и порт — network.json рядом с БД, по умолчанию http://127.0.0.1:8080)
   3. Запуск как Windows Service:
        .\install-service.ps1 -Port 8080
   4. Под IIS: нужен ASP.NET Core Hosting Bundle (~25 МБ), затем releases\install.ps1

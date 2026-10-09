@@ -39,6 +39,8 @@ WinAdmin/
 # Backend (Kestrel на 5099)
 $env:ASPNETCORE_ENVIRONMENT='Development'
 dotnet run --project src/backend/WinAdmin.Api --urls http://localhost:5099
+# --urls задаёт порт только при первом запуске (создаётся network.json рядом с БД);
+# дальше адрес/порт берутся из него: WinAdmin.exe network set --port 5099
 
 # Frontend (Vite dev, проксирует /api на backend)
 npm --prefix src/frontend install
@@ -113,10 +115,10 @@ git push origin v1.0.1
 
 ```powershell
 # Напрямую — нулевые зависимости
-.\WinAdmin.exe --urls http://localhost:8080
+.\WinAdmin.exe            # http://127.0.0.1:8080 (адрес/порт — network.json рядом с БД)
 
 # Как Windows Service
-sc.exe create WinAdmin binPath="C:\apps\WinAdmin\WinAdmin.exe --urls http://localhost:8080"
+sc.exe create WinAdmin binPath="C:\apps\WinAdmin\WinAdmin.exe"
 sc.exe start WinAdmin
 ```
 

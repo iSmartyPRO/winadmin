@@ -40,15 +40,17 @@ Self-contained пакет для **Windows Server 2019** (и новее), **x64*
 
 ```powershell
 cd C:\apps\WinAdmin
-.\WinAdmin.exe --urls http://0.0.0.0:8080
+.\WinAdmin.exe
 ```
 
-Откройте в браузере: **http://<имя-сервера>:8080**
+Откройте в браузере на этом компьютере: **http://127.0.0.1:8080**
+
+Адрес и порт задаёт `network.json` рядом с БД (см. п. 5).
 
 Проверка здоровья:
 
 ```powershell
-Invoke-RestMethod http://localhost:8080/health
+Invoke-RestMethod http://127.0.0.1:8080/health
 ```
 
 Остановка: `Ctrl + C` в окне консоли.
@@ -87,7 +89,9 @@ cd C:\apps\WinAdmin
 Скрипт:
 
 - создаёт службу `WinAdmin` с автозапуском;
-- открывает порт в брандмауэре;
+- создаёт `C:\ProgramData\WinAdmin\network.json` (только этот компьютер, порт `-Port`);
+- ограничивает права: папка приложения — запись только Администраторы/SYSTEM, `C:\ProgramData\WinAdmin` — доступ только Администраторы/SYSTEM;
+- удаляет старое правило брандмауэра `WinAdmin HTTP <порт>` (было открыто для всех адресов);
 - задаёт `WinAdmin__DatabasePath` → `C:\ProgramData\WinAdmin\WinAdmin.db`.
 
 Управление службой:
@@ -108,18 +112,32 @@ sc.exe delete WinAdmin
 ### Ручная установка службы (без скрипта)
 
 ```powershell
-sc.exe create WinAdmin binPath="C:\apps\WinAdmin\WinAdmin.exe --urls http://0.0.0.0:8080" start= auto
+sc.exe create WinAdmin binPath="C:\apps\WinAdmin\WinAdmin.exe" start= auto
 sc.exe start WinAdmin
 ```
 
 ---
 
-## 5. Брандмауэр (если не использовали install-service.ps1)
+## 5. Сетевой доступ
+
+По умолчанию панель доступна **только с этого компьютера** (`127.0.0.1`), правило брандмауэра не нужно.
+Настройки хранятся в `C:\ProgramData\WinAdmin\network.json` и применяются **без перезапуска службы**.
+
+В веб-интерфейсе: **Настройки → Сеть** (нужен scope `admin`).
+
+Из консоли администратора:
 
 ```powershell
-New-NetFirewallRule -DisplayName "WinAdmin HTTP 8080" `
-  -Direction Inbound -Protocol TCP -LocalPort 8080 -Action Allow
+.\WinAdmin.exe network show
+.\WinAdmin.exe network set --port 9090
+.\WinAdmin.exe network set --mode network --allow "10.77.77.0/24,192.168.88.5"
+.\WinAdmin.exe network set --mode local
 ```
+
+В режиме `network` WinAdmin сам создаёт правило брандмауэра `WinAdmin (managed)` — только для перечисленных
+адресов и только в профилях «Домен» и «Частная». Трафик не шифруется (HTTP) — используйте только в доверенной сети.
+
+Под IIS адрес и порт задаёт сайт IIS — эти настройки не действуют.
 
 ---
 
@@ -178,6 +196,8 @@ Self-contained exe можно запускать **без IIS** — это пр�
 .\WinAdmin.exe user add --login operator --password "..." --scopes "system.read,services.read"
 .\WinAdmin.exe user list
 .\WinAdmin.exe user set-password --login admin --password "новый"
+.\WinAdmin.exe network show
+.\WinAdmin.exe network set --port 9090
 ```
 
 ---
@@ -189,9 +209,10 @@ Self-contained exe можно запускать **без IIS** — это пр�
 | 403 в «Авторизация» | Запуск от имени администратора |
 | Мало событий за «30 дней» | Увеличить размер журнала Security (п. 7) |
 | 401 при входе | Создать пользователя (`user add`) |
-| Порт занят | Сменить порт: `--urls http://0.0.0.0:9090` |
+| Порт занят | `.\WinAdmin.exe network set --port 9090` |
 | Сессии сбрасываются | Задать `WinAdmin__Jwt__Secret` |
-| Не открывается с другой машины | Брандмауэр (п. 5), `0.0.0.0` в `--urls` |
+| Не открывается с другой машины | Режим «Сеть» с нужной подсетью (п. 5) |
+| Панель пропала после смены порта | `.\WinAdmin.exe network show` / `network set --port 8080` из консоли администратора |
 
 Swagger API: `http://<сервер>:8080/swagger`
 

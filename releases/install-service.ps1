@@ -1,6 +1,15 @@
-<#
+﻿<#
 .SYNOPSIS
     Install WinAdmin as a Windows service (quick server setup).
+
+.DESCRIPTION
+    - Registers the WinAdmin service (LocalSystem, auto start) without --urls:
+      address and port come from network.json in the data folder.
+    - Creates network.json (mode "local" = 127.0.0.1 only) if it does not exist.
+    - Restricts folder permissions: install folder writable by Administrators/SYSTEM only,
+      data folder (database, network.json) accessible by Administrators/SYSTEM only.
+    - Removes the legacy "WinAdmin HTTP <port>" firewall rule (open to any address).
+      Network access is enabled later with: WinAdmin.exe network set --mode network --allow <subnets>
 
 .EXAMPLE
     .\install-service.ps1
@@ -25,7 +34,27 @@ if (-not (Test-Path $exe)) { throw "Not found: $exe" }
 
 New-Item -ItemType Directory -Force -Path $DataPath | Out-Null
 
-$binPath = "`"$exe`" --urls http://0.0.0.0:$Port"
+# ── Network settings (address/port) ──────────────────────────────
+$networkFile = Join-Path $DataPath "network.json"
+if (-not (Test-Path $networkFile)) {
+    @{ mode = "local"; port = $Port; allow = @() } | ConvertTo-Json | Set-Content -Path $networkFile -Encoding UTF8
+    Write-Host "Created $networkFile (local, port $Port)" -ForegroundColor Green
+} else {
+    Write-Host "Keeping existing $networkFile" -ForegroundColor Yellow
+}
+
+# ── Folder permissions (by SID: Administrators, SYSTEM, Users) ───
+function Set-StrictAcl([string]$Path, [string[]]$Grants) {
+    icacls $Path /reset /T /C /Q | Out-Null
+    icacls $Path /inheritance:r /grant:r @Grants /C /Q | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "icacls failed for $Path" }
+}
+Set-StrictAcl $InstallPath @('*S-1-5-32-544:(OI)(CI)F', '*S-1-5-18:(OI)(CI)F', '*S-1-5-32-545:(OI)(CI)RX')
+Set-StrictAcl $DataPath    @('*S-1-5-32-544:(OI)(CI)F', '*S-1-5-18:(OI)(CI)F')
+Write-Host "Folder permissions restricted: $InstallPath, $DataPath" -ForegroundColor Green
+
+# ── Service ──────────────────────────────────────────────────────
+$binPath = "`"$exe`""
 $existing = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
 if ($existing) {
     if ($existing.Status -eq 'Running') { Stop-Service $ServiceName -Force }
@@ -41,16 +70,21 @@ $dbPath = Join-Path $DataPath "WinAdmin.db"
 Write-Host "WinAdmin__DatabasePath = $dbPath" -ForegroundColor Yellow
 Write-Host "Recommended: also set WinAdmin__Jwt__Secret (see README.md)" -ForegroundColor Yellow
 
-$ruleName = "WinAdmin HTTP $Port"
-if (-not (Get-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue)) {
-    New-NetFirewallRule -DisplayName $ruleName -Direction Inbound -Protocol TCP -LocalPort $Port -Action Allow | Out-Null
-    Write-Host "Firewall rule added: $ruleName" -ForegroundColor Green
+# ── Legacy firewall rule (was open to any address) ───────────────
+$legacyRule = "WinAdmin HTTP $Port"
+if (Get-NetFirewallRule -DisplayName $legacyRule -ErrorAction SilentlyContinue) {
+    Remove-NetFirewallRule -DisplayName $legacyRule
+    Write-Host "Removed legacy firewall rule: $legacyRule" -ForegroundColor Green
 }
 
 Start-Service $ServiceName
+$settings = Get-Content $networkFile -Raw | ConvertFrom-Json
 Write-Host ""
 Write-Host "Service '$ServiceName' started." -ForegroundColor Green
-Write-Host "Open: http://localhost:$Port" -ForegroundColor Green
+Write-Host "Open: http://127.0.0.1:$($settings.port)" -ForegroundColor Green
+Write-Host ""
+Write-Host "Network access (optional, admin console):" -ForegroundColor Yellow
+Write-Host "  .\WinAdmin.exe network set --mode network --allow 10.0.0.0/24" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "Create the first user (if none yet):" -ForegroundColor Yellow
 Write-Host "  cd `"$InstallPath`"" -ForegroundColor Yellow
