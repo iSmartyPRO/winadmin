@@ -47,6 +47,25 @@ SSO текущим пользователем Windows. `404` — вход дом
 ### `GET /environment/latest` — право `platform.environment.check`
 Последние результаты (в том числе фоновой проверки, раз в час).
 
+## Пользователи AD (модуль `ad-users`)
+
+Права `ad-users.read`, `ad-users.edit`, `ad-users.move`, `ad-users.password`, `ad-users.offboard` — с областью «Проекты (OU)».
+Выключенный модуль — `404`. Ошибки: `403` вне области/зоны, `404` нет пользователя, `409` не настроено
+(корневая OU, группа/OU уволенных, нет OU пользователей в проекте), `422` AD отклонил запись (текст — что делегировать),
+`503` контроллер домена недоступен.
+
+| Метод | Путь | Право |
+|---|---|---|
+| GET | `/ad/projects` | `ad-users.read` (только проекты области) |
+| GET | `/ad/users?project=&status=active\|disabled\|terminated\|all&q=` | `ad-users.read` (`terminated` — `ad-users.offboard`) |
+| GET | `/ad/users/{sam}` · `/ad/users/{sam}/photo` · `/ad/users/{sam}/history` | `ad-users.read` |
+| PUT | `/ad/users/{sam}/attributes` `{ attributes: { имя: значение } }` | `ad-users.edit` |
+| PUT · DELETE | `/ad/users/{sam}/photo` (тело — JPEG/PNG) | `ad-users.edit` |
+| POST | `/ad/users/{sam}/move` `{ projectDn }` | `ad-users.move` |
+| POST | `/ad/users/{sam}/password` `{ password?, generate, mustChange }` → `{ password }` | `ad-users.password` |
+| POST | `/ad/users/{sam}/deactivate` → шаги | `ad-users.offboard` |
+| POST | `/ad/users/{sam}/activate` `{ projectDn }` → `{ steps, password }` | `ad-users.offboard` |
+
 ### `GET /directory/search?q=<текст>&kind=user|group` — право `platform.roles.manage`
 Пользователи и группы AD для назначения ролей: `[{ sid, kind, samAccountName, displayName, upn, enabled }]`.
 `503` — контроллер домена недоступен.
