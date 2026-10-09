@@ -30,7 +30,17 @@ public sealed class NetworkSettingsService : INetworkSettingsService
 
     public void Apply(NetworkSettings next, NetworkSettings previous)
     {
-        ApplyFirewall(next, [previous.Port]);
+        try
+        {
+            ApplyFirewall(next, [previous.Port]);
+        }
+        catch
+        {
+            // Команды удаляют старое правило до создания нового — без восстановления
+            // неудачное добавление оставило бы режим «Сеть» вообще без правила.
+            try { ApplyFirewall(previous, [next.Port]); } catch { /* исходная ошибка важнее */ }
+            throw;
+        }
         _store.Write(next);
     }
 

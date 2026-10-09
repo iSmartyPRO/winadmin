@@ -78,4 +78,27 @@ public sealed class NetworkSettingsServiceTests : IDisposable
 
         Assert.True(_service.Current.IsEquivalentTo(previous));
     }
+
+    [Fact]
+    public void Failed_add_restores_previous_firewall_rule()
+    {
+        // Сейчас «Сеть» для 10.0.0.0/24; новое правило не создаётся — старое должно вернуться.
+        var previous = new NetworkSettings(NetworkMode.Network, 8080, ["10.0.0.0/24"]);
+        _store.Write(previous);
+        var runs = new List<IReadOnlyList<FirewallCommand>>();
+        _firewall.Setup(f => f.Run(It.IsAny<IReadOnlyList<FirewallCommand>>()))
+            .Callback<IReadOnlyList<FirewallCommand>>(c =>
+            {
+                runs.Add(c);
+                if (c.Any(x => x.Args.Contains("remoteip=192.168.1.0/24")))
+                    throw new InvalidOperationException("netsh add failed");
+            });
+
+        Assert.Throws<InvalidOperationException>(() =>
+            _service.Apply(new NetworkSettings(NetworkMode.Network, 8080, ["192.168.1.0/24"]), previous));
+
+        Assert.Equal(2, runs.Count);
+        Assert.Contains(runs[1], c => c.Args.Contains("remoteip=10.0.0.0/24"));
+        Assert.True(_service.Current.IsEquivalentTo(previous));
+    }
 }
