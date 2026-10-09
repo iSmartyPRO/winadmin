@@ -10,6 +10,37 @@
 
 ---
 
+## Вход и домен
+
+### `POST /auth/login` — без ключа
+Тело `{ "login": "...", "password": "..." }`. Сначала локальный пользователь WinAdmin, затем учётка
+домена (только по HTTPS или с loopback). Ответ `200 { accessToken, expiresIn }` + cookie `wa_refresh`.
+Ошибки: `400` пароль домена не по HTTPS · `401` неверный логин или пароль · `403` нет назначений ·
+`429` лимит попыток (`Retry-After`) · `503` контроллер домена недоступен.
+
+### `POST /auth/refresh` · `POST /auth/logout` — cookie `wa_refresh`
+Учётка домена при обновлении перепроверяется в каталоге.
+
+### `GET /auth/windows` — Negotiate (Kerberos)
+SSO текущим пользователем Windows. `404` — вход доменом выключен; `401` — нет Kerberos (NTLM не
+принимается); иначе как `/auth/login`.
+
+### `GET /auth/options` — без ключа
+`{ "directory": true|false }` — показывать ли кнопку входа Windows.
+
+### `GET /settings/directory` · `PUT /settings/directory` — право `platform.directory.manage`
+`{ enabled, domain, server, baseDn, useLdaps }`; пустой `server` — поиск контроллера через DNS,
+пустой `baseDn` — весь домен. Включено без домена — `400`.
+
+### `POST /settings/directory/test` — право `platform.directory.manage`
+Пошаговая проверка: `[{ name, ok, message }]`.
+
+### `GET /directory/search?q=<текст>&kind=user|group` — право `platform.roles.manage`
+Пользователи и группы AD для назначения ролей: `[{ sid, kind, samAccountName, displayName, upn, enabled }]`.
+`503` — контроллер домена недоступен.
+
+---
+
 ## Система
 
 ### `GET /system` — право `system.read`
