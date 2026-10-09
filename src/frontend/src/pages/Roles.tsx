@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import {
-  Alert, App, Button, Card, Drawer, Empty, Form, Input, List, Popconfirm, Select, Space, Table, Tag, Tree, Typography,
+  App, Button, Card, Drawer, Empty, Form, Input, List, Popconfirm, Select, Space, Table, Tag, Tree, Typography,
 } from 'antd'
 import type { DataNode } from 'antd/es/tree'
 import { DeleteOutlined, EditOutlined, PlusOutlined, TeamOutlined } from '@ant-design/icons'
@@ -126,13 +126,37 @@ function AssignmentsDrawer({ role, open, onClose, onChanged }: {
   const [principal, setPrincipal] = useState<string>()
   const { data: users } = useApi(api.users)
   const { data: keys } = useApi(api.apiKeys)
+  const isAd = type === 'AdUser' || type === 'AdGroup'
+  const [adOptions, setAdOptions] = useState<{ value: string; label: string }[]>([])
+  const [searching, setSearching] = useState(false)
+  const searchAd = useMemo(() => {
+    let timer: number | undefined
+    return (q: string) => {
+      window.clearTimeout(timer)
+      if (q.trim().length < 2) { setAdOptions([]); return }
+      timer = window.setTimeout(async () => {
+        setSearching(true)
+        try {
+          const found = await api.directory.search(q, type === 'AdGroup' ? 'group' : 'user')
+          setAdOptions(found.map((e) => ({
+            value: e.sid,
+            label: `${e.displayName ?? e.samAccountName} (${e.samAccountName})${e.enabled ? '' : ' — отключён'}`,
+          })))
+        } catch (e) {
+          message.error(errorText(e, 'Поиск в AD не выполнен'))
+        } finally {
+          setSearching(false)
+        }
+      }, 300)
+    }
+  }, [type, message])
 
   const load = async () => role && setItems(await api.assignments.list({ roleId: role.id }))
 
   const add = async () => {
     if (!role || !principal) return
     try {
-      await api.assignments.create(role.id, type, principal)
+      await api.assignments.create(role.id, type, principal, isAd ? adOptions.find((o) => o.value === principal)?.label : undefined)
       setPrincipal(undefined)
       await load()
       onChanged()
@@ -158,13 +182,23 @@ function AssignmentsDrawer({ role, open, onClose, onChanged }: {
   return (
     <Drawer title={`Кому назначена «${role?.name ?? ''}»`} open={open} onClose={onClose} width={520} afterOpenChange={(v) => v && load()}>
       <Space.Compact style={{ width: '100%', marginBottom: 16 }}>
-        <Select value={type} style={{ width: 190 }} onChange={(v) => { setType(v); setPrincipal(undefined) }}
-          options={[{ value: 'LocalUser', label: 'Пользователь WinAdmin' }, { value: 'ApiKey', label: 'API-ключ' }]} />
-        <Select value={principal} onChange={setPrincipal} options={options} showSearch optionFilterProp="label"
-          placeholder="Выберите" style={{ flex: 1 }} />
+        <Select value={type} style={{ width: 190 }} onChange={(v) => { setType(v); setPrincipal(undefined); setAdOptions([]) }}
+          options={[
+            { value: 'LocalUser', label: 'Пользователь WinAdmin' },
+            { value: 'AdUser', label: 'Пользователь AD' },
+            { value: 'AdGroup', label: 'Группа AD' },
+            { value: 'ApiKey', label: 'API-ключ' },
+          ]} />
+        {isAd ? (
+          <Select value={principal} onChange={setPrincipal} options={adOptions} showSearch filterOption={false}
+            onSearch={searchAd} loading={searching} placeholder="Имя (от 2 символов)" style={{ flex: 1 }}
+            notFoundContent={searching ? 'Поиск…' : 'Ничего не найдено'} />
+        ) : (
+          <Select value={principal} onChange={setPrincipal} options={options} showSearch optionFilterProp="label"
+            placeholder="Выберите" style={{ flex: 1 }} />
+        )}
         <Button type="primary" icon={<PlusOutlined />} onClick={add} disabled={!principal}>Назначить</Button>
       </Space.Compact>
-      <Alert type="info" showIcon style={{ marginBottom: 12 }} message="Пользователи и группы Active Directory появятся после настройки подключения к домену." />
       {items.length === 0 ? <Empty description="Роль никому не назначена" /> : (
         <List
           dataSource={items}
@@ -175,7 +209,7 @@ function AssignmentsDrawer({ role, open, onClose, onChanged }: {
               </Popconfirm>,
             ]}>
               <Space>
-                <Tag>{a.principalType === 'LocalUser' ? 'пользователь' : a.principalType === 'ApiKey' ? 'API-ключ' : a.principalType}</Tag>
+                <Tag>{({ LocalUser: 'пользователь', ApiKey: 'API-ключ', AdUser: 'пользователь AD', AdGroup: 'группа AD' } as Record<string, string>)[a.principalType] ?? a.principalType}</Tag>
                 {a.displayName}
               </Space>
             </List.Item>

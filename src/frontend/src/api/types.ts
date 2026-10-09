@@ -318,3 +318,22 @@ export interface ModuleDto {
   settingsSchema: SettingsField[]
   settings: Record<string, unknown>
 }
+
+export interface DirectorySettings {
+  enabled: boolean
+  domain: string | null
+  server: string | null
+  baseDn: string | null
+  useLdaps: boolean
+}
+
+export interface DirectoryTestStep { name: string; ok: boolean; message: string }
+
+export interface DirectoryEntry {
+  sid: string
+  kind: 'user' | 'group'
+  samAccountName: string
+  displayName: string | null
+  upn: string | null
+  enabled: boolean
+}

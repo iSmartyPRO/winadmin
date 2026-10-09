@@ -1,6 +1,6 @@
-import { useState } from 'react'
-import { Button, Card, Form, Input, Typography, App } from 'antd'
-import { LockOutlined, UserOutlined } from '@ant-design/icons'
+import { useEffect, useState } from 'react'
+import { Button, Card, Divider, Form, Input, Typography, App } from 'antd'
+import { LockOutlined, UserOutlined, WindowsOutlined } from '@ant-design/icons'
 import { authApi } from '../api/authApi'
 import { setStoredToken } from '../api/client'
 
@@ -9,6 +9,23 @@ const { Title, Paragraph } = Typography
 export default function LoginForm({ onAuthed }: { onAuthed: () => void }) {
   const { message } = App.useApp()
   const [loading, setLoading] = useState(false)
+  const [windowsAvailable, setWindowsAvailable] = useState(false)
+  const [windowsLoading, setWindowsLoading] = useState(false)
+
+  useEffect(() => { authApi.options().then((o) => setWindowsAvailable(o.directory)).catch(() => {}) }, [])
+
+  const signInWindows = async () => {
+    setWindowsLoading(true)
+    try {
+      const resp = await authApi.windows()
+      setStoredToken(resp.accessToken)
+      onAuthed()
+    } catch (err: any) {
+      message.error(err?.message ?? 'Вход Windows не выполнен')
+    } finally {
+      setWindowsLoading(false)
+    }
+  }
 
   const submit = async ({ login, password }: { login: string; password: string }) => {
     setLoading(true)
@@ -40,7 +57,7 @@ export default function LoginForm({ onAuthed }: { onAuthed: () => void }) {
             label="Логин"
             rules={[{ required: true, message: 'Введите логин' }]}
           >
-            <Input prefix={<UserOutlined />} placeholder="admin" size="large" autoFocus />
+            <Input prefix={<UserOutlined />} placeholder="admin или ДОМЕН\\пользователь" size="large" autoFocus />
           </Form.Item>
           <Form.Item
             name="password"
@@ -52,6 +69,14 @@ export default function LoginForm({ onAuthed }: { onAuthed: () => void }) {
           <Button type="primary" htmlType="submit" block size="large" loading={loading}>
             Войти
           </Button>
+          {windowsAvailable && (
+            <>
+              <Divider plain>или</Divider>
+              <Button icon={<WindowsOutlined />} block size="large" loading={windowsLoading} onClick={signInWindows}>
+                Войти как текущий пользователь Windows
+              </Button>
+            </>
+          )}
         </Form>
       </Card>
     </div>

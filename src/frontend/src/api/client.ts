@@ -9,6 +9,7 @@ import type {
   ExcludedUserDto, NetworkSettingsDto, UpdateNetworkSettingsRequest,
   ModuleDto, PermissionGroupDto, PrincipalType, RoleAssignmentDto, RoleDto, SaveRoleRequest,
   InstalledApp, InstalledUpdate, SoftwareJob,
+  DirectorySettings, DirectoryTestStep, DirectoryEntry,
 } from './types'
 
 // ── JWT storage (sessionStorage — очищается при закрытии вкладки) ──
@@ -131,6 +132,14 @@ export const api = {
     create: (roleId: string, principalType: PrincipalType, principalId: string, displayName?: string) =>
       http.post<RoleAssignmentDto>('/role-assignments', { roleId, principalType, principalId, displayName }).then((r) => r.data),
     remove: (id: string) => http.delete(`/role-assignments/${id}`),
+  },
+
+  directory: {
+    get: () => http.get<DirectorySettings>('/settings/directory').then((r) => r.data),
+    save: (s: DirectorySettings) => http.put<DirectorySettings>('/settings/directory', s).then((r) => r.data),
+    test: () => http.post<DirectoryTestStep[]>('/settings/directory/test').then((r) => r.data),
+    search: (q: string, kind: 'user' | 'group') =>
+      http.get<DirectoryEntry[]>('/directory/search', { params: { q, kind } }).then((r) => r.data),
   },
 
   modules: {
