@@ -192,6 +192,22 @@ export interface ExcludedUserDto {
   createdAt: string
 }
 
+export type NetworkMode = 'Local' | 'Network'
+
+export interface NetworkSettingsDto {
+  mode: NetworkMode
+  port: number
+  allow: string[]
+  url: string
+  firewallRule: boolean
+}
+
+export interface UpdateNetworkSettingsRequest {
+  mode: NetworkMode
+  port: number
+  allow: string[]
+}
+
 export type SoftwareJobType = 'UninstallApp' | 'UninstallUpdate' | 'RollbackUpdate'
 export type SoftwareJobStatus = 'Queued' | 'Running' | 'Succeeded' | 'Failed'
 

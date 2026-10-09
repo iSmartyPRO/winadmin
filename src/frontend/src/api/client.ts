@@ -6,7 +6,7 @@ import type {
   SystemInfo, SystemMetrics, PowerRequest, UserDto,
   CreateUserRequest, TokenResponse,
   EventLogQueryParams, EventLogQueryResult,
-  ExcludedUserDto,
+  ExcludedUserDto, NetworkSettingsDto, UpdateNetworkSettingsRequest,
   InstalledApp, InstalledUpdate, SoftwareJob,
 } from './types'
 
@@ -122,6 +122,9 @@ export const api = {
     addExcludedUser: (userName: string) =>
       http.post<ExcludedUserDto>('/settings/excluded-users', { userName }).then((r) => r.data),
     removeExcludedUser: (id: string) => http.delete(`/settings/excluded-users/${id}`),
+    network: () => http.get<NetworkSettingsDto>('/settings/network').then((r) => r.data),
+    updateNetwork: (req: UpdateNetworkSettingsRequest) =>
+      http.put<{ url: string }>('/settings/network', req).then((r) => r.data),
   },
 
   software: {

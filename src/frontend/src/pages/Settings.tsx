@@ -4,6 +4,7 @@ import { DeleteOutlined, PlusOutlined, UserDeleteOutlined } from '@ant-design/ic
 import { api } from '../api/client'
 import type { ExcludedUserDto } from '../api/types'
 import PageHeader from '../components/PageHeader'
+import NetworkSettingsCard from '../components/NetworkSettingsCard'
 
 const { Text, Paragraph } = Typography
 
@@ -57,10 +58,12 @@ export default function Settings() {
     <div>
       <PageHeader
         title="Настройки"
-        subtitle="Учётные записи, скрываемые из журналов событий"
+        subtitle="Сетевой доступ к панели и учётные записи, скрываемые из журналов"
         onRefresh={load}
         loading={loading}
       />
+
+      <NetworkSettingsCard />
 
       <Card
         title={
