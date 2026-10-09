@@ -263,36 +263,31 @@ public sealed class NetworkSettingsApiTests(NetworkApiFactory factory)
         var result = await response.Content.ReadFromJsonAsync<NetworkUpdateResult>(JsonOpts);
         Assert.Equal($"http://localhost:{port}", result!.Url);
 
-        // Запись происходит после отправки ответа (Response.OnCompleted).
-        bool written = false;
-        for (int i = 0; i < 50 && !written; i++)
-        {
-            written = File.ReadAllText(NetworkFile).Contains($"\"port\": {port}");
-            if (!written) await Task.Delay(100);
-        }
-        Assert.True(written);
+        // Применение — после отправки ответа (Response.OnCompleted); аудит пишется последним.
+        // Файл читаем только после аудита: чтение во время записи мешало бы приложению его записать.
+        var applied = await WaitForAuditAsync($"→ network:{port} [");
+        Assert.True(applied?.Success, applied?.Details);
+        Assert.Contains($"\"port\": {port}", File.ReadAllText(NetworkFile));
         Assert.Contains(factory.Firewall.Calls, c => c.Any(x => x.Args.Contains("remoteip=10.77.77.0/24")));
-
-        // Аудит пишется после файла — тоже ждём.
-        bool audited = false;
-        for (int i = 0; i < 50 && !audited; i++)
-        {
-            using var scope = factory.Services.CreateScope();
-            var audit = await scope.ServiceProvider.GetRequiredService<IAuditService>().QueryAsync();
-            audited = audit.Any(a => a.Action == "settings.network" && a.Success);
-            if (!audited) await Task.Delay(100);
-        }
-        Assert.True(audited);
 
         // Вернуть Local и дождаться применения, чтобы не влиять на другие тесты коллекции.
         await client.PutAsJsonAsync("/api/v1/settings/network", new { mode = "Local", port, allow = Array.Empty<string>() });
-        bool reset = false;
-        for (int i = 0; i < 150 && !reset; i++)
+        var reset = await WaitForAuditAsync($"→ local:{port}");
+        Assert.True(reset?.Success, reset?.Details);
+        Assert.Contains("\"mode\": \"local\"", File.ReadAllText(NetworkFile));
+    }
+
+    private async Task<AuditEntryDto?> WaitForAuditAsync(string detail)
+    {
+        for (int i = 0; i < 150; i++)
         {
-            reset = File.ReadAllText(NetworkFile).Contains("\"mode\": \"local\"");
-            if (!reset) await Task.Delay(100);
+            using var scope = factory.Services.CreateScope();
+            var audit = await scope.ServiceProvider.GetRequiredService<IAuditService>().QueryAsync();
+            var entry = audit.FirstOrDefault(a => a.Action == "settings.network" && a.Details?.Contains(detail) == true);
+            if (entry is not null) return entry;
+            await Task.Delay(100);
         }
-        Assert.True(reset);
+        return null;
     }
 
     private static readonly System.Text.Json.JsonSerializerOptions JsonOpts = new(System.Text.Json.JsonSerializerDefaults.Web)
