@@ -19,6 +19,8 @@ import Settings from './pages/Settings'
 import EventLogs from './pages/EventLogs'
 import Applications from './pages/Applications'
 import Updates from './pages/Updates'
+import Modules from './pages/Modules'
+import Roles from './pages/Roles'
 
 export default function App() {
   const [authed, setAuthed] = useState(() => Boolean(getStoredToken()))
@@ -53,6 +55,8 @@ export default function App() {
           <Route path="/cp/audit" element={<Guard perm="platform.audit.read"><AuditLog /></Guard>} />
           <Route path="/cp/users" element={<Guard perm="platform.users.manage"><Users /></Guard>} />
           <Route path="/cp/settings" element={<Guard perm={['platform.network.manage', 'eventlogs.manage']}><Settings /></Guard>} />
+          <Route path="/cp/roles" element={<Guard perm="platform.roles.manage"><Roles /></Guard>} />
+          <Route path="/cp/modules" element={<Guard perm="platform.modules.manage"><Modules /></Guard>} />
           <Route path="/docs" element={<ApiDocs />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
