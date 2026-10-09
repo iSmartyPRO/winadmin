@@ -29,6 +29,7 @@ public sealed class NetworkApiFactory : WebApplicationFactory<Program>
     public HashSet<int> BusyPorts { get; } = [];
     public FakeDirectory Directory { get; } = new();
     public FakeWindowsReader Windows { get; } = new();
+    public FakeAdReader AdReader { get; } = new();
     public DirectorySettings DirectorySettings { get; set; } = new(true, "test.local", null, null, false);
 
     /// <summary>Клиент, чьи запросы сервер видит пришедшими с указанного адреса (только в тестах).</summary>
@@ -70,6 +71,8 @@ public sealed class NetworkApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<IStartupFilter, TestRemoteIp>();
             var monitor = services.SingleOrDefault(d => d.ImplementationType == typeof(WinAdmin.Infrastructure.EnvironmentChecks.EnvironmentMonitor));
             if (monitor is not null) services.Remove(monitor);
+            services.RemoveAll<IAdReader>();
+            services.AddSingleton<IAdReader>(AdReader);
             services.RemoveAll<IWindowsSignInReader>();
             services.AddSingleton<IWindowsSignInReader>(Windows);
             // Настоящий NegotiateHandler требует Kestrel (IConnectionItemsFeature) и падает в TestServer.
