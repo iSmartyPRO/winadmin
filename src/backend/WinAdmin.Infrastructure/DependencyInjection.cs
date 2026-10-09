@@ -55,6 +55,7 @@ public static class DependencyInjection
         services.AddScoped<IRoleService, RoleService>();
         services.AddSingleton<IMachineInfo, WmiMachineInfo>();
         services.AddSingleton<IDirectorySettingsStore, DirectorySettingsStore>();
+        services.AddSingleton<IDirectoryService>(sp => new LdapDirectoryService(sp.GetRequiredService<IDirectorySettingsStore>()));
         services.AddSingleton<IModuleRegistry, ModuleRegistry>();
 
         return services;
