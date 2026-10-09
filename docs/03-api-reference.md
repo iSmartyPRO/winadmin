@@ -35,6 +35,18 @@ SSO текущим пользователем Windows. `404` — вход дом
 ### `POST /settings/directory/test` — право `platform.directory.manage`
 Пошаговая проверка: `[{ name, ok, message }]`.
 
+### `GET /settings/ad` · `PUT /settings/ad` — право `platform.directory.manage`
+Структура каталога для модулей AD: `{ rootOu, usersOuName, hiddenOus[], writeMode: ServiceAccount|ProcessAccount, writeLogin, hasWritePassword }`.
+В `PUT` пароль передаётся полем `writePassword`: не передан или `null` — не менять, `""` — удалить, иначе — заменить.
+`rootOu` — DN вида `OU=…,DC=…`, иначе `400`. Аудит `settings.ad` (без пароля).
+
+### `GET /environment?module=<id>&depth=quick|full` — право `platform.environment.check`
+Запускает проверки: без `module` — платформа и включённые модули. Ответ:
+`[{ moduleId, at, overall: Ok|Warning|Failed, results: [{ code, title, status: Ok|Warning|Failed|Skipped, message, fix }] }]`.
+
+### `GET /environment/latest` — право `platform.environment.check`
+Последние результаты (в том числе фоновой проверки, раз в час).
+
 ### `GET /directory/search?q=<текст>&kind=user|group` — право `platform.roles.manage`
 Пользователи и группы AD для назначения ролей: `[{ sid, kind, samAccountName, displayName, upn, enabled }]`.
 `503` — контроллер домена недоступен.
