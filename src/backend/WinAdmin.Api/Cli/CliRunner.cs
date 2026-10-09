@@ -2,7 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System.CommandLine;
 using WinAdmin.Core.Abstractions;
+using WinAdmin.Core.Modules;
 using WinAdmin.Infrastructure;
+using WinAdmin.Infrastructure.Access;
 using WinAdmin.Infrastructure.Network;
 using WinAdmin.Infrastructure.Secrets;
 using WinAdmin.Infrastructure.Security;
@@ -28,17 +30,20 @@ public static class CliRunner
         {
             var services = new ServiceCollection();
             services.AddSingleton(protector);
-            if (args is ["user", ..])
+            services.AddSingleton(new PermissionCatalog(BuiltInModules.All));
+            if (args is ["user", ..] or ["role", ..])
                 services.AddWinAdminDatabase(databaseStore.ResolveForUse(databaseStore.Read(dbPath)));
             services.AddScoped<IUserService, UserService>();
             services.AddWinAdminNetwork(new NetworkSettingsStore(dataDirectory));
             provider = services.BuildServiceProvider();
 
-            if (args is ["user", ..])
+            if (args is ["user", ..] or ["role", ..])
             {
                 using var scope = provider.CreateScope();
                 var db = scope.ServiceProvider.GetRequiredService<WinAdminDbContext>();
                 await db.Database.MigrateAsync();
+                // Роль «Администратор» должна существовать и до первого запуска службы.
+                await PlatformBootstrapper.RunAsync(db, provider.GetRequiredService<PermissionCatalog>());
             }
         }
         catch (Exception ex)
@@ -60,7 +65,10 @@ public static class CliRunner
         var keysCommand = new Command("keys", "Ключ шифрования секретов");
         KeysCommands.Register(keysCommand, keys);
 
-        var root = new RootCommand("WinAdmin CLI") { userCommand, networkCommand, dbCommand, keysCommand };
+        var roleCommand = new Command("role", "Роли WinAdmin");
+        RoleCommands.Register(roleCommand, provider);
+
+        var root = new RootCommand("WinAdmin CLI") { userCommand, networkCommand, dbCommand, keysCommand, roleCommand };
         return await root.InvokeAsync(args);
     }
 }
