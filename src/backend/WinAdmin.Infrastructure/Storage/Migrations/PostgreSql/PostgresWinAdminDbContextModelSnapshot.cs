@@ -121,6 +121,29 @@ namespace WinAdmin.Infrastructure.Storage.Migrations.PostgreSql
                     b.ToTable("ExcludedUsers");
                 });
 
+            modelBuilder.Entity("WinAdmin.Infrastructure.Storage.ModuleStateEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("SettingsJson")
+                        .HasColumnType("text");
+
+                    b.Property<long>("UpdatedAt")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ModuleStates");
+                });
+
             modelBuilder.Entity("WinAdmin.Infrastructure.Storage.RefreshTokenEntity", b =>
                 {
                     b.Property<string>("Id")
@@ -151,6 +174,90 @@ namespace WinAdmin.Infrastructure.Storage.Migrations.PostgreSql
                     b.HasIndex("UserId");
 
                     b.ToTable("RefreshTokens");
+                });
+
+            modelBuilder.Entity("WinAdmin.Infrastructure.Storage.RoleAssignmentEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("PrincipalId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("PrincipalType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("RoleId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PrincipalType", "PrincipalId");
+
+                    b.HasIndex("RoleId", "PrincipalType", "PrincipalId")
+                        .IsUnique();
+
+                    b.ToTable("RoleAssignments");
+                });
+
+            modelBuilder.Entity("WinAdmin.Infrastructure.Storage.RoleEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsBuiltin")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("Roles");
+                });
+
+            modelBuilder.Entity("WinAdmin.Infrastructure.Storage.RolePermissionEntity", b =>
+                {
+                    b.Property<string>("RoleId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("PermissionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("ScopeJson")
+                        .HasColumnType("text");
+
+                    b.HasKey("RoleId", "PermissionId");
+
+                    b.ToTable("RolePermissions");
                 });
 
             modelBuilder.Entity("WinAdmin.Infrastructure.Storage.UserEntity", b =>
@@ -194,6 +301,35 @@ namespace WinAdmin.Infrastructure.Storage.Migrations.PostgreSql
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("WinAdmin.Infrastructure.Storage.RoleAssignmentEntity", b =>
+                {
+                    b.HasOne("WinAdmin.Infrastructure.Storage.RoleEntity", "Role")
+                        .WithMany("Assignments")
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Role");
+                });
+
+            modelBuilder.Entity("WinAdmin.Infrastructure.Storage.RolePermissionEntity", b =>
+                {
+                    b.HasOne("WinAdmin.Infrastructure.Storage.RoleEntity", "Role")
+                        .WithMany("Permissions")
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Role");
+                });
+
+            modelBuilder.Entity("WinAdmin.Infrastructure.Storage.RoleEntity", b =>
+                {
+                    b.Navigation("Assignments");
+
+                    b.Navigation("Permissions");
                 });
 
             modelBuilder.Entity("WinAdmin.Infrastructure.Storage.UserEntity", b =>
