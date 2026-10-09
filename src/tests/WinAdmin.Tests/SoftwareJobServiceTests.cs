@@ -157,7 +157,8 @@ public sealed class SoftwareJobServiceTests
     [Fact]
     public async Task Timeout_FailsCancelsRunnerAndAllowsSecondStartOnlyAfterFinished()
     {
-        var (svc, catalog, runner, _, _) = Create(TimeSpan.FromMilliseconds(50));
+        // Таймер тайм-аута реальный: запас, чтобы проверка конфликта успела до тайм-аута под нагрузкой.
+        var (svc, catalog, runner, _, _) = Create(TimeSpan.FromSeconds(1));
         catalog.Apps.Add(new InstalledApp
         {
             Id = "reg:App1",
