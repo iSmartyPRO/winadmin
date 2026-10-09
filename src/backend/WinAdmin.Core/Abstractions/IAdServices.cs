@@ -1,3 +1,4 @@
+using WinAdmin.Core.Operations;
 using WinAdmin.Core.Security;
 using WinAdmin.Core.Models;
 using WinAdmin.Core.ActiveDirectory.Users;
@@ -80,4 +81,6 @@ public interface IAdUsersService
     Task<AdUserView> MoveAsync(IAccessContext actor, string sam, string projectDn, CancellationToken ct = default);
     /// <summary>generate=true — сгенерировать и вернуть; иначе — задать password, вернуть null.</summary>
     Task<string?> ResetPasswordAsync(IAccessContext actor, string sam, string? password, bool generate, bool mustChange, CancellationToken ct = default);
+    Task<IReadOnlyList<ScenarioStep>> DeactivateAsync(IAccessContext actor, string sam, CancellationToken ct = default);
+    Task<ActivationResult> ActivateAsync(IAccessContext actor, string sam, string projectDn, CancellationToken ct = default);
 }
