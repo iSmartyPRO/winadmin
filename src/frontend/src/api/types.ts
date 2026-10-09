@@ -99,7 +99,7 @@ export interface OperationResult {
 export interface ApiKeyDto {
   id: string
   name: string
-  scopes: string[]
+  roles: string[]
   createdAt: string
   expiresAt?: string
   lastUsedAt?: string
@@ -137,7 +137,7 @@ export interface TokenResponse {
 export interface UserDto {
   id: string
   login: string
-  scopes: string[]
+  roles: string[]
   createdAt: string
   isActive: boolean
 }
@@ -145,12 +145,15 @@ export interface UserDto {
 export interface CreateUserRequest {
   login: string
   password: string
-  scopes: string[]
+  roleIds: string[]
 }
 
 export interface MeResponse {
-  login: string
-  scopes: string[]
+  actor: string
+  principal: string
+  /** право → область (null — без ограничений) */
+  permissions: Record<string, string[] | null>
+  modules: { id: string; title: string }[]
 }
 
 export interface EventLogEntryDto {
@@ -246,4 +249,72 @@ export interface SoftwareJob {
   error?: string
   startedAt: string
   finishedAt?: string
+}
+
+export type PrincipalType = 'LocalUser' | 'AdUser' | 'AdGroup' | 'ApiKey'
+
+export interface PermissionDto {
+  id: string
+  title: string
+  description?: string
+  scopable: boolean
+  dangerous: boolean
+}
+
+export interface PermissionGroupDto {
+  id: string
+  title: string
+  scopable: boolean
+  scopeTitle?: string
+  permissions: PermissionDto[]
+}
+
+export interface RoleGrantDto {
+  permissionId: string
+  scope: string[] | null
+}
+
+export interface RoleDto {
+  id: string
+  name: string
+  description?: string
+  isBuiltin: boolean
+  permissions: RoleGrantDto[]
+  assignmentCount: number
+}
+
+export interface SaveRoleRequest {
+  name: string
+  description?: string
+  permissions: RoleGrantDto[]
+}
+
+export interface RoleAssignmentDto {
+  id: string
+  roleId: string
+  roleName: string
+  principalType: PrincipalType
+  principalId: string
+  displayName: string
+  createdAt: string
+}
+
+export interface SettingsField {
+  name: string
+  title: string
+  kind: 'string' | 'number' | 'boolean' | 'stringList' | 'secret'
+}
+
+export interface ModuleDto {
+  id: string
+  title: string
+  description?: string
+  enabled: boolean
+  available: boolean
+  unavailableReason?: string
+  scopable: boolean
+  scopeTitle?: string
+  permissions: PermissionDto[]
+  settingsSchema: SettingsField[]
+  settings: Record<string, unknown>
 }

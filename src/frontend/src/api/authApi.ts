@@ -29,7 +29,7 @@ export const authApi = {
   },
 
   me: async (token: string): Promise<MeResponse> => {
-    const res = await fetch('/api/v1/auth/me', {
+    const res = await fetch('/api/v1/me', {
       headers: { Authorization: `Bearer ${token}` },
     })
     if (!res.ok) throw new Error('Unauthorized')

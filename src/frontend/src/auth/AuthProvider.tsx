@@ -6,6 +6,10 @@ import type { MeResponse } from '../api/types'
 interface AuthState {
   user: MeResponse | null
   token: string
+  /** Есть ли право (с любой областью). */
+  can: (permission: string) => boolean
+  /** Включён ли модуль. */
+  moduleOn: (moduleId: string) => boolean
   logout: () => Promise<void>
 }
 
@@ -40,8 +44,11 @@ export function AuthProvider({ children, onLogout }: { children: ReactNode; onLo
     onLogout()
   }, [onLogout])
 
+  const can = useCallback((permission: string) => Boolean(user && permission in user.permissions), [user])
+  const moduleOn = useCallback((id: string) => Boolean(user?.modules.some((m) => m.id === id)), [user])
+
   return (
-    <AuthContext.Provider value={{ user, token, logout }}>
+    <AuthContext.Provider value={{ user, token, can, moduleOn, logout }}>
       {children}
     </AuthContext.Provider>
   )

@@ -7,6 +7,7 @@ import type {
   CreateUserRequest, TokenResponse,
   EventLogQueryParams, EventLogQueryResult,
   ExcludedUserDto, NetworkSettingsDto, UpdateNetworkSettingsRequest,
+  ModuleDto, PermissionGroupDto, PrincipalType, RoleAssignmentDto, RoleDto, SaveRoleRequest,
   InstalledApp, InstalledUpdate, SoftwareJob,
 } from './types'
 
@@ -93,17 +94,14 @@ export const api = {
   cancelPower: () => http.post<OperationResult>('/power/cancel').then((r) => r.data),
 
   apiKeys: () => http.get<ApiKeyDto[]>('/apikeys').then((r) => r.data),
-  availableScopes: () => http.get<string[]>('/apikeys/scopes').then((r) => r.data),
-  createKey: (name: string, scopes: string[], expiresAt?: string) =>
-    http.post<CreatedApiKey>('/apikeys', { name, scopes, expiresAt }).then((r) => r.data),
+  createKey: (name: string, roleIds: string[], expiresAt?: string) =>
+    http.post<CreatedApiKey>('/apikeys', { name, roleIds, expiresAt }).then((r) => r.data),
   revokeKey: (id: string) => http.delete<OperationResult>(`/apikeys/${id}`).then((r) => r.data),
 
   audit: (limit = 300) => http.get<AuditEntryDto[]>('/audit', { params: { limit } }).then((r) => r.data),
 
   users: () => http.get<UserDto[]>('/users').then((r) => r.data),
   createUser: (req: CreateUserRequest) => http.post<UserDto>('/users', req).then((r) => r.data),
-  updateUserScopes: (id: string, scopes: string[]) =>
-    http.put(`/users/${id}/scopes`, { scopes }),
   changeUserPassword: (id: string, newPassword: string) =>
     http.put(`/users/${id}/password`, { newPassword }),
   setUserActive: (id: string, isActive: boolean) =>
@@ -114,6 +112,30 @@ export const api = {
     logNames: () => http.get<string[]>('/eventlogs/lognames').then((r) => r.data),
     query: (params: EventLogQueryParams) =>
       http.get<EventLogQueryResult>('/eventlogs/query', { params }).then((r) => r.data),
+  },
+
+  me: () => http.get<MeResponse>('/me').then((r) => r.data),
+
+  permissions: () => http.get<PermissionGroupDto[]>('/permissions').then((r) => r.data),
+
+  roles: {
+    list: () => http.get<RoleDto[]>('/roles').then((r) => r.data),
+    create: (req: SaveRoleRequest) => http.post<RoleDto>('/roles', req).then((r) => r.data),
+    update: (id: string, req: SaveRoleRequest) => http.put<RoleDto>(`/roles/${id}`, req).then((r) => r.data),
+    remove: (id: string) => http.delete(`/roles/${id}`),
+  },
+
+  assignments: {
+    list: (params: { principalType?: PrincipalType; principalId?: string; roleId?: string }) =>
+      http.get<RoleAssignmentDto[]>('/role-assignments', { params }).then((r) => r.data),
+    create: (roleId: string, principalType: PrincipalType, principalId: string, displayName?: string) =>
+      http.post<RoleAssignmentDto>('/role-assignments', { roleId, principalType, principalId, displayName }).then((r) => r.data),
+    remove: (id: string) => http.delete(`/role-assignments/${id}`),
+  },
+
+  modules: {
+    list: () => http.get<ModuleDto[]>('/modules').then((r) => r.data),
+    update: (id: string, body: { enabled?: boolean; settings?: Record<string, unknown> }) => http.put(`/modules/${id}`, body),
   },
 
   settings: {

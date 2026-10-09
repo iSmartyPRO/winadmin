@@ -13,18 +13,12 @@ export default function KeyGate({ onAuthed }: { onAuthed: () => void }) {
     setLoading(true)
     setStoredKey(key.trim())
     try {
-      // Любой read-эндпоинт подтвердит валидность ключа.
-      await api.system()
+      // /me отвечает любому действительному ключу, независимо от его прав.
+      await api.me()
       message.success('Доступ подтверждён')
       onAuthed()
     } catch {
-      try {
-        // Ключ может не иметь system.read, но быть admin — проверим scopes.
-        await api.availableScopes()
-        onAuthed()
-      } catch {
-        message.error('Ключ недействителен или не имеет прав')
-      }
+      message.error('Ключ недействителен')
     } finally {
       setLoading(false)
     }

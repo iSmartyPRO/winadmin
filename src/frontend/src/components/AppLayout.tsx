@@ -1,12 +1,23 @@
-import { Layout, Menu, Typography, Button, Tooltip, Grid } from 'antd'
+import { Layout, Menu, Typography, Button, Tooltip, Grid, type MenuProps } from 'antd'
 import {
   DashboardOutlined, HddOutlined, ApiOutlined, AppstoreOutlined,
   PrinterOutlined, PoweroffOutlined, KeyOutlined, FileSearchOutlined,
   BookOutlined, LogoutOutlined, DesktopOutlined, TeamOutlined,
-  FileTextOutlined, SettingOutlined, CodeOutlined,
+  FileTextOutlined, SettingOutlined, CodeOutlined, SafetyCertificateOutlined, AppstoreAddOutlined,
 } from '@ant-design/icons'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import type { ReactNode } from 'react'
 import { useAuth } from '../auth/AuthProvider'
+
+type Item = {
+  key?: string
+  type?: 'divider'
+  icon?: ReactNode
+  label?: string
+  perm?: string | string[]
+  module?: string
+  children?: Item[]
+}
 
 const { Sider, Header, Content, Footer } = Layout
 const { Text } = Typography
@@ -16,25 +27,37 @@ export default function AppLayout({ machine }: { machine?: string; onLogout: () 
   const navigate = useNavigate()
   const screens = Grid.useBreakpoint()
   const collapsed = !screens.lg
-  const { user, logout } = useAuth()
-  const isAdmin = user?.scopes.includes('admin') ?? false
+  const { can, moduleOn, logout } = useAuth()
 
-  const items = [
-    { key: '/', icon: <DashboardOutlined />, label: 'Дашборд' },
-    { key: '/disks', icon: <HddOutlined />, label: 'Диски' },
-    { key: '/services', icon: <ApiOutlined />, label: 'Службы' },
-    { key: '/processes', icon: <AppstoreOutlined />, label: 'Процессы' },
+  const allowed = (i: Item) =>
+    (!i.module || moduleOn(i.module)) && (!i.perm || (Array.isArray(i.perm) ? i.perm.some(can) : can(i.perm)))
+  const filter = (list: Item[]): Item[] =>
+    list.filter(allowed)
+      .map((i) => (i.children ? { ...i, children: filter(i.children) } : i))
+      .filter((i) => !i.children || i.children.length > 0)
+      // Разделитель не нужен в начале, в конце и подряд с другим разделителем.
+      .filter((i, idx, arr) => i.type !== 'divider' || (idx > 0 && idx < arr.length - 1 && arr[idx - 1].type !== 'divider'))
+  // perm/module — только для фильтра, в Menu (и в DOM) их не передаём.
+  const toMenu = (list: Item[]): MenuProps['items'] =>
+    list.map(({ perm: _perm, module: _module, children, ...rest }) =>
+      (children ? { ...rest, children: toMenu(children) } : rest) as NonNullable<MenuProps['items']>[number])
+
+  const items = filter([
+    { key: '/', icon: <DashboardOutlined />, label: 'Дашборд', perm: 'system.read', module: 'system' },
+    { key: '/disks', icon: <HddOutlined />, label: 'Диски', perm: 'system.read', module: 'system' },
+    { key: '/services', icon: <ApiOutlined />, label: 'Службы', perm: 'services.read', module: 'services' },
+    { key: '/processes', icon: <AppstoreOutlined />, label: 'Процессы', perm: 'processes.read', module: 'processes' },
     {
-      key: '/software', icon: <CodeOutlined />, label: 'Software',
+      key: '/software', icon: <CodeOutlined />, label: 'Software', perm: 'software.read', module: 'software',
       children: [
         { key: '/software/apps', label: 'Applications' },
         { key: '/software/updates', label: 'Updates' },
       ],
     },
-    { key: '/printers', icon: <PrinterOutlined />, label: 'Принтеры' },
-    { key: '/power', icon: <PoweroffOutlined />, label: 'Питание' },
+    { key: '/printers', icon: <PrinterOutlined />, label: 'Принтеры', perm: 'printers.read', module: 'printers' },
+    { key: '/power', icon: <PoweroffOutlined />, label: 'Питание', perm: 'power.manage', module: 'power' },
     {
-      key: '/logs', icon: <FileTextOutlined />, label: 'Журналы Windows',
+      key: '/logs', icon: <FileTextOutlined />, label: 'Журналы Windows', perm: 'eventlogs.read', module: 'eventlogs',
       children: [
         { key: '/logs/auth', label: 'Авторизация' },
         { key: '/logs/security', label: 'Security (все события)' },
@@ -42,17 +65,20 @@ export default function AppLayout({ machine }: { machine?: string; onLogout: () 
         { key: '/logs/application', label: 'Приложения' },
         { key: '/logs/powershell', label: 'PowerShell' },
         { key: '/logs/setup', label: 'Установка ПО' },
-        { type: 'divider' as const },
+        { type: 'divider' },
         { key: '/logs/custom', label: 'Произвольный журнал' },
       ],
     },
-    { type: 'divider' as const },
-    ...(isAdmin ? [{ key: '/cp/users', icon: <TeamOutlined />, label: 'Пользователи' }] : []),
-    { key: '/cp/apikeys', icon: <KeyOutlined />, label: 'API-ключи' },
-    { key: '/cp/audit', icon: <FileSearchOutlined />, label: 'Аудит' },
-    ...(isAdmin ? [{ key: '/cp/settings', icon: <SettingOutlined />, label: 'Настройки' }] : []),
+    { type: 'divider' },
+    { key: '/cp/users', icon: <TeamOutlined />, label: 'Пользователи', perm: 'platform.users.manage' },
+    { key: '/cp/roles', icon: <SafetyCertificateOutlined />, label: 'Роли', perm: 'platform.roles.manage' },
+    { key: '/cp/modules', icon: <AppstoreAddOutlined />, label: 'Модули', perm: 'platform.modules.manage' },
+    { key: '/cp/apikeys', icon: <KeyOutlined />, label: 'API-ключи', perm: 'platform.apikeys.manage' },
+    { key: '/cp/audit', icon: <FileSearchOutlined />, label: 'Аудит', perm: 'platform.audit.read' },
+    { key: '/cp/settings', icon: <SettingOutlined />, label: 'Настройки', perm: ['platform.network.manage', 'eventlogs.manage'] },
     { key: '/docs', icon: <BookOutlined />, label: 'API-документация' },
-  ]
+  ])
+
 
   return (
     <Layout style={{ minHeight: '100vh', background: 'transparent' }}>
@@ -72,7 +98,7 @@ export default function AppLayout({ machine }: { machine?: string; onLogout: () 
           mode="inline"
           selectedKeys={[location.pathname]}
           defaultOpenKeys={location.pathname.startsWith('/software') ? ['/logs', '/software'] : ['/logs']}
-          items={items}
+          items={toMenu(items)}
           onClick={({ key }) => navigate(key)}
           style={{ background: 'transparent', borderInlineEnd: 'none' }}
         />

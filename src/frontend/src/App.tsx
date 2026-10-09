@@ -4,6 +4,7 @@ import { api, getStoredToken } from './api/client'
 import LoginForm from './auth/LoginForm'
 import { AuthProvider } from './auth/AuthProvider'
 import AppLayout from './components/AppLayout'
+import Guard from './components/Guard'
 import Dashboard from './pages/Dashboard'
 import Disks from './pages/Disks'
 import Services from './pages/Services'
@@ -39,19 +40,19 @@ export default function App() {
     <AuthProvider onLogout={handleLogout}>
       <Routes>
         <Route element={<AppLayout machine={machine} onLogout={handleLogout} />}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/disks" element={<Disks />} />
-          <Route path="/services" element={<Services />} />
-          <Route path="/processes" element={<Processes />} />
-          <Route path="/printers" element={<Printers />} />
-          <Route path="/power" element={<Power />} />
-          <Route path="/software/apps" element={<Applications />} />
-          <Route path="/software/updates" element={<Updates />} />
-          <Route path="/logs/:presetKey" element={<EventLogs />} />
-          <Route path="/cp/apikeys" element={<ApiKeys />} />
-          <Route path="/cp/audit" element={<AuditLog />} />
-          <Route path="/cp/users" element={<Users />} />
-          <Route path="/cp/settings" element={<Settings />} />
+          <Route path="/" element={<Guard perm="system.read" module="system"><Dashboard /></Guard>} />
+          <Route path="/disks" element={<Guard perm="system.read" module="system"><Disks /></Guard>} />
+          <Route path="/services" element={<Guard perm="services.read" module="services"><Services /></Guard>} />
+          <Route path="/processes" element={<Guard perm="processes.read" module="processes"><Processes /></Guard>} />
+          <Route path="/printers" element={<Guard perm="printers.read" module="printers"><Printers /></Guard>} />
+          <Route path="/power" element={<Guard perm="power.manage" module="power"><Power /></Guard>} />
+          <Route path="/software/apps" element={<Guard perm="software.read" module="software"><Applications /></Guard>} />
+          <Route path="/software/updates" element={<Guard perm="software.read" module="software"><Updates /></Guard>} />
+          <Route path="/logs/:presetKey" element={<Guard perm="eventlogs.read" module="eventlogs"><EventLogs /></Guard>} />
+          <Route path="/cp/apikeys" element={<Guard perm="platform.apikeys.manage"><ApiKeys /></Guard>} />
+          <Route path="/cp/audit" element={<Guard perm="platform.audit.read"><AuditLog /></Guard>} />
+          <Route path="/cp/users" element={<Guard perm="platform.users.manage"><Users /></Guard>} />
+          <Route path="/cp/settings" element={<Guard perm={['platform.network.manage', 'eventlogs.manage']}><Settings /></Guard>} />
           <Route path="/docs" element={<ApiDocs />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

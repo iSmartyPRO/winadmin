@@ -16,7 +16,7 @@ const { Text } = Typography
 
 export default function ApiKeys() {
   const { data, loading, refresh } = useApi(api.apiKeys)
-  const { data: scopes } = useApi(api.availableScopes)
+  const { data: roles } = useApi(api.roles.list)
   const { message } = App.useApp()
   const [form] = Form.useForm()
   const [open, setOpen] = useState(false)
@@ -24,10 +24,10 @@ export default function ApiKeys() {
   const [newSecret, setNewSecret] = useState<string>()
 
   const submit = async () => {
-    const v = await form.validateFields() as { name: string; scopes: string[]; expiresAt?: Dayjs }
+    const v = await form.validateFields() as { name: string; roleIds: string[]; expiresAt?: Dayjs }
     setCreating(true)
     try {
-      const created = await api.createKey(v.name, v.scopes, v.expiresAt?.toISOString())
+      const created = await api.createKey(v.name, v.roleIds, v.expiresAt?.toISOString())
       setNewSecret(created.plaintextKey)
       setOpen(false)
       form.resetFields()
@@ -44,8 +44,8 @@ export default function ApiKeys() {
       await api.revokeKey(id)
       message.success('Ключ отозван')
       await refresh(true)
-    } catch {
-      message.error('Не удалось отозвать ключ')
+    } catch (e) {
+      message.error((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Не удалось отозвать ключ')
     }
   }
 
@@ -66,10 +66,10 @@ export default function ApiKeys() {
       ),
     },
     {
-      title: 'Scopes', dataIndex: 'scopes',
+      title: 'Роли', dataIndex: 'roles',
       render: (s: string[]) => (
         <Space size={[4, 4]} wrap>
-          {s.map((x) => <Tag key={x} color={x === 'admin' ? 'gold' : 'blue'}>{x}</Tag>)}
+          {s.length === 0 ? <Tag>нет ролей</Tag> : s.map((x) => <Tag key={x} color={x === 'Администратор' ? 'gold' : 'blue'}>{x}</Tag>)}
         </Space>
       ),
     },
@@ -104,13 +104,13 @@ export default function ApiKeys() {
       </Card>
 
       <Modal title="Новый API-ключ" open={open} onOk={submit} confirmLoading={creating} onCancel={() => setOpen(false)} okText="Создать">
-        <Form form={form} layout="vertical" initialValues={{ scopes: [] }}>
+        <Form form={form} layout="vertical" initialValues={{ roleIds: [] }}>
           <Form.Item name="name" label="Имя" rules={[{ required: true, message: 'Укажите имя' }]}>
             <Input placeholder="Например: monitoring-system" />
           </Form.Item>
-          <Form.Item name="scopes" label="Права (scopes)" rules={[{ required: true, message: 'Выберите хотя бы один scope' }]}>
-            <Select mode="multiple" placeholder="Выберите scopes"
-              options={(scopes ?? []).map((s) => ({ label: s, value: s }))} />
+          <Form.Item name="roleIds" label="Роли" rules={[{ required: true, message: 'Выберите хотя бы одну роль' }]}>
+            <Select mode="multiple" placeholder="Выберите роли"
+              options={(roles ?? []).map((r) => ({ label: r.name, value: r.id }))} />
           </Form.Item>
           <Form.Item name="expiresAt" label="Срок действия (опционально)">
             <DatePicker showTime style={{ width: '100%' }} />
