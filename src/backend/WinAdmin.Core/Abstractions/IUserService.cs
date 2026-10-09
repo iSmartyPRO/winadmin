@@ -14,4 +14,7 @@ public interface IUserService
     Task<UserPrincipal?> ValidateAsync(string login, string password, CancellationToken ct = default);
 
     Task<bool> AnyAsync(CancellationToken ct = default);
+
+    /// <summary>Есть ли локальный пользователь с таким логином (включённый или нет).</summary>
+    Task<bool> ExistsAsync(string login, CancellationToken ct = default);
 }

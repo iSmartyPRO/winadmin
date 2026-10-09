@@ -151,6 +151,7 @@ builder.Services
             ClockSkew = TimeSpan.FromSeconds(30),
             NameClaimType = System.Security.Claims.ClaimTypes.Name,
         };
+        options.Events = new JwtBearerEvents { OnTokenValidated = DirectorySessionValidator.OnTokenValidated };
     });
 
 var authzBuilder = builder.Services.AddAuthorizationBuilder();

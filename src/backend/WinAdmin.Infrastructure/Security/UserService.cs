@@ -64,6 +64,9 @@ public sealed class UserService : IUserService
         return ToPrincipal(entity);
     }
 
+    public Task<bool> ExistsAsync(string login, CancellationToken ct = default)
+        => _db.Users.AnyAsync(u => u.Login == login, ct);
+
     public Task<bool> AnyAsync(CancellationToken ct = default)
         => _db.Users.AnyAsync(ct);
 

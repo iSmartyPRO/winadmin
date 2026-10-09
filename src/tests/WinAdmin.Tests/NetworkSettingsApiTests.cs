@@ -1,14 +1,20 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Moq;
 using WinAdmin.Core.Abstractions;
+using WinAdmin.Core.ActiveDirectory;
 using WinAdmin.Core.Models;
 using WinAdmin.Core.Modules;
 using WinAdmin.Core.Security;
 using WinAdmin.Infrastructure.Network;
+using WinAdmin.Tests.Fakes;
 
 namespace WinAdmin.Tests;
 
@@ -18,10 +24,23 @@ public sealed class NetworkApiFactory : WebApplicationFactory<Program>
     public string DataDir { get; } = Path.Combine(Path.GetTempPath(), "winadmin-api-" + Guid.NewGuid().ToString("N"));
     public FakeFirewall Firewall { get; } = new();
     public HashSet<int> BusyPorts { get; } = [];
+    public FakeDirectory Directory { get; } = new();
+    public DirectorySettings DirectorySettings { get; set; } = new(true, "test.local", null, null, false);
+
+    /// <summary>Клиент, чьи запросы сервер видит пришедшими с указанного адреса (только в тестах).</summary>
+    public HttpClient ClientFrom(string ip)
+    {
+        var client = CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true });
+        client.DefaultRequestHeaders.Add(TestRemoteIp.Header, ip);
+        return client;
+    }
+
+    public HttpClient Loopback() => ClientFrom("127.0.0.1");
+    public HttpClient Remote() => ClientFrom("10.1.2.3");
 
     public NetworkApiFactory()
     {
-        Directory.CreateDirectory(DataDir);
+        System.IO.Directory.CreateDirectory(DataDir);
         // Program читает конфигурацию до Build(), поэтому — через переменные окружения.
         Environment.SetEnvironmentVariable("WinAdmin__DatabasePath", Path.Combine(DataDir, "WinAdmin.db"));
         Environment.SetEnvironmentVariable("WinAdmin__Network__VerifyDelaySeconds", "3600");
@@ -36,6 +55,15 @@ public sealed class NetworkApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<IFirewallRunner>(Firewall);
             services.RemoveAll<IPortProbe>();
             services.AddSingleton<IPortProbe>(new FakeProbe(BusyPorts));
+            services.RemoveAll<IDirectoryService>();
+            services.AddSingleton<IDirectoryService>(Directory);
+            services.RemoveAll<IDirectorySettingsStore>();
+            var settings = new Mock<IDirectorySettingsStore>();
+            settings.Setup(s => s.GetAsync(It.IsAny<CancellationToken>())).ReturnsAsync(() => DirectorySettings);
+            settings.Setup(s => s.SaveAsync(It.IsAny<DirectorySettings>(), It.IsAny<CancellationToken>()))
+                .Callback<DirectorySettings, CancellationToken>((s, _) => DirectorySettings = s).Returns(Task.CompletedTask);
+            services.AddSingleton(settings.Object);
+            services.AddSingleton<IStartupFilter, TestRemoteIp>();
         });
     }
 
@@ -98,7 +126,7 @@ public sealed class NetworkApiFactory : WebApplicationFactory<Program>
         Environment.SetEnvironmentVariable("WinAdmin__DatabasePath", null);
         Environment.SetEnvironmentVariable("WinAdmin__Network__VerifyDelaySeconds", null);
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-        try { Directory.Delete(DataDir, recursive: true); } catch (IOException) { }
+        try { System.IO.Directory.Delete(DataDir, recursive: true); } catch (IOException) { }
     }
 
     public sealed class FakeFirewall : IFirewallRunner
@@ -112,6 +140,23 @@ public sealed class NetworkApiFactory : WebApplicationFactory<Program>
         public bool IsInUse(int port) => busy.Contains(port);
         public bool IsListening(NetworkSettings settings) => true;
     }
+}
+
+/// <summary>Тестовый адрес клиента: TestServer не заполняет RemoteIpAddress.</summary>
+public sealed class TestRemoteIp : IStartupFilter
+{
+    public const string Header = "X-Test-Remote-Ip";
+
+    public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
+    {
+        app.Use((ctx, nxt) =>
+        {
+            if (ctx.Request.Headers.TryGetValue(Header, out var ip) && System.Net.IPAddress.TryParse(ip, out var parsed))
+                ctx.Connection.RemoteIpAddress = parsed;
+            return nxt();
+        });
+        next(app);
+    };
 }
 
 [CollectionDefinition("network-api", DisableParallelization = true)]
