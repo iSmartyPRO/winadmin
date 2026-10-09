@@ -4,6 +4,7 @@ using System.CommandLine;
 using WinAdmin.Core.Abstractions;
 using WinAdmin.Infrastructure;
 using WinAdmin.Infrastructure.Network;
+using WinAdmin.Infrastructure.Secrets;
 using WinAdmin.Infrastructure.Security;
 using WinAdmin.Infrastructure.Storage;
 
@@ -16,9 +17,18 @@ public static class CliRunner
         // Minimal DI — DB + user service + network settings
         var services = new ServiceCollection();
         string dbPath = WinAdminPaths.DatabasePath(config["WinAdmin:DatabasePath"]);
-        services.AddWinAdminDatabase(new DatabaseSettings(DatabaseProvider.Sqlite, $"Data Source={dbPath}"));
+        string dataDirectory = WinAdminPaths.DataDirectory(dbPath);
+        var keys = new MasterKeyStore(Path.Combine(dataDirectory, "keys"));
+        ISecretProtector protector = keys.Exists || args is ["user", ..]
+            ? new AesGcmSecretProtector(keys.LoadOrCreate())
+            : new UnavailableSecretProtector($"Ключ шифрования {keys.FilePath} не найден.");
+        var databaseStore = new DatabaseSettingsStore(dataDirectory, protector);
+
+        services.AddSingleton(protector);
+        if (args is ["user", ..])
+            services.AddWinAdminDatabase(databaseStore.ResolveForUse(databaseStore.Read(dbPath)));
         services.AddScoped<IUserService, UserService>();
-        services.AddWinAdminNetwork(new NetworkSettingsStore(WinAdminPaths.DataDirectory(dbPath)));
+        services.AddWinAdminNetwork(new NetworkSettingsStore(dataDirectory));
 
         var provider = services.BuildServiceProvider();
 

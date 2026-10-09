@@ -62,7 +62,15 @@ catch (Exception ex) when (ex is SecretUnavailableException or IOException or Un
     Console.WriteLine($"Ключ шифрования недоступен: {ex.Message}");
     secretProtector = new UnavailableSecretProtector(ex.Message);
 }
-string connectionString = $"Data Source={dbPath}";
+// Провайдер БД: database.json (sqlite | postgresql), по умолчанию — SQLite по WinAdmin:DatabasePath.
+var databaseStore = new DatabaseSettingsStore(dataDirectory, secretProtector);
+var storedDatabase = databaseStore.Read(dbPath);
+if (!databaseStore.Exists)
+{
+    try { databaseStore.Write(storedDatabase); }
+    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Console.WriteLine($"Не удалось создать {databaseStore.FilePath}: {ex.Message}"); }
+}
+DatabaseSettings database = databaseStore.ResolveForUse(storedDatabase);
 
 // Сетевые настройки: network.json рядом с БД → Kestrel:Endpoints (перепривязка на лету).
 // Порт из старого --urls используется только при первом создании файла.
@@ -99,7 +107,7 @@ builder.Services.AddControllers()
     {
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
-builder.Services.AddWinAdminInfrastructure(new DatabaseSettings(DatabaseProvider.Sqlite, connectionString), jwtOptions);
+builder.Services.AddWinAdminInfrastructure(database, jwtOptions);
 builder.Services.AddWinAdminNetwork(networkStore);
 builder.Services.AddSingleton(secretProtector);
 builder.Services.AddSingleton<NetworkApplyWatchdog>();
