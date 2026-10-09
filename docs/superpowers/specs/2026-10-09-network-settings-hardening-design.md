@@ -35,7 +35,7 @@
 | CLI | `WinAdmin.exe network show` / `network set` |
 | ACL | `InstallationHardening` при старте службы; `icacls` в `install-service.ps1` и установщике `winadmin-ctl` |
 | Установщики | Убрать `--urls` из `binPath`; `winadmin-ctl` читает/пишет порт через `network.json` |
-| Тесты | Новый проект `tests/WinAdmin.Tests` (xUnit) |
+| Тесты | Существующий проект `src/tests/WinAdmin.Tests` (xUnit) |
 
 ### Не входит
 
@@ -62,10 +62,11 @@ public sealed record NetworkSettings(NetworkMode Mode, int Port, IReadOnlyList<s
 
 **Расположение:** каталог `WinAdmin:DatabasePath` (`Path.GetDirectoryName`), иначе `AppContext.BaseDirectory`. Тот же алгоритм в API и CLI — вынести в общий хелпер `WinAdminPaths` (Infrastructure), заменив дублирующийся расчёт `dbPath` в `Program.cs` и `CliRunner.cs`.
 
-**Валидация** (`NetworkSettingsValidator`, чистая функция, возвращает список ошибок):
+**Валидация** (`NetworkSettingsValidator` в `WinAdmin.Core/Network`, чистая функция, возвращает нормализованные настройки и список ошибок):
 
 - `Port` ∈ [1, 65535].
 - `Allow`: каждый элемент — IPv4/IPv6-адрес или CIDR (`10.77.77.0/24`, префикс в пределах семейства). Пробелы обрезаются, дубликаты удаляются.
+- IPv4 — ровно четыре октета (`IPAddress.TryParse("10")` принимает «10» как `0.0.0.10`, это отсекается); префикс `/0` запрещён (это «любой адрес»).
 - `Mode = Network` → `Allow` не пуст (никакого «Any»).
 - `Mode = Local` → `Allow` сохраняется как есть (чтобы переключение туда-обратно не теряло список), но не применяется.
 
@@ -92,9 +93,9 @@ public sealed record NetworkSettings(NetworkMode Mode, int Port, IReadOnlyList<s
 **Порядок в API `PUT`:**
 
 1. Валидация → `400 { message, errors[] }`; занят порт → `409 { message }`.
-2. Ответ `200 { url }` (новый URL панели: `http://127.0.0.1:{port}` или `http://<имя-машины>:{port}`).
+2. Ответ `200 { url }` (новый URL панели: `Local` → `http://127.0.0.1:{port}`; `Network` → хост из текущего запроса (`Request.Host.Host`) с новым портом).
 3. В `Response.OnCompleted`: брандмауэр → запись `network.json` → аудит `settings.network` (было → стало).
-4. Фоновая проверка через 10 с (`NetworkApplyWatchdog`, hosted service): выбирает адреса из `IServerAddressesFeature` / пробное подключение `TcpClient` к новому endpoint. Если не слушаем — восстановить предыдущий `network.json` и правило брандмауэра, аудит `settings.network.rollback`, лог-ошибка.
+4. Фоновая проверка через `WinAdmin:Network:VerifyDelaySeconds` (по умолчанию 10 с) (`NetworkApplyWatchdog`, hosted service): выбирает адреса из `IServerAddressesFeature` / пробное подключение `TcpClient` к новому endpoint. Если не слушаем — восстановить предыдущий `network.json` и правило брандмауэра, аудит `settings.network.rollback`, лог-ошибка.
 
 **Аварийный путь:** `WinAdmin.exe network set ...` из консоли администратора работает всегда; запущенная служба подхватит файл сама.
 
@@ -105,7 +106,7 @@ public sealed record NetworkSettings(NetworkMode Mode, int Port, IReadOnlyList<s
 - `Mode = Network` → правило удаляется и создаётся заново (идемпотентно).
 - Всегда удаляются устаревшие правила `WinAdmin HTTP *` (создавались `install-service.ps1` / `winadmin-ctl`).
 - Реализация: `netsh advfirewall firewall delete|add rule ...` через `Process` (без PowerShell). Построение аргументов — чистая функция `FirewallCommands.Build(settings)` → список argv, тестируется отдельно. Выполнение — `IFirewallRunner` (подменяется в тестах).
-- Сверка при старте службы: `ApplyFirewall(Load())`. Ошибка (нет прав) — предупреждение в логе, старт не прерывается.
+- Сверка при старте **только при запуске как служба Windows** (`WindowsServiceHelpers.IsWindowsService()`): `ApplyFirewall(Load())`. Ошибка — предупреждение в логе, старт не прерывается.
 
 Удаление устаревших правил по шаблону: `netsh` не поддерживает wildcard, поэтому удаляются конкретные имена `WinAdmin HTTP {port}` для текущего порта и для порта из `urls`; плюс `WinAdmin (managed)`.
 
@@ -140,12 +141,12 @@ WinAdmin.exe network set [--mode local|network] [--port N] [--allow "10.77.77.0/
 
 ## Права на папки
 
-`InstallationHardening` (Infrastructure), вызывается при старте веб-режима:
+`InstallationHardening` (Infrastructure), вызывается при старте **только при запуске как служба Windows** (чтобы не трогать ACL папки сборки при `dotnet run` / тестах от администратора):
 
 - **Папка приложения** (`AppContext.BaseDirectory`): защищённый DACL (`SetAccessRuleProtection(true, false)`), правила по SID — `S-1-5-32-544` (Администраторы) и `S-1-5-18` (SYSTEM) FullControl, `S-1-5-32-545` (Пользователи) ReadAndExecute; все с наследованием `ContainerInherit | ObjectInherit`. Для вложенных файлов/папок: удалить явные ACE, включить наследование.
 - **Папка данных** (каталог `network.json`/БД), если она отличается от папки приложения: то же, но **без** Пользователей.
 - Если папка данных совпадает с папкой приложения (БД рядом с exe) — у Пользователей остаётся ReadAndExecute на всё; в лог предупреждение «вынесите БД в ProgramData».
-- Пропускается, если процесс не администратор/SYSTEM (`WindowsPrincipal.IsInRole(Administrator)` или SID SYSTEM) — предупреждение в логе.
+- Ошибка доступа (`UnauthorizedAccessException`) — предупреждение в логе.
 - Ошибки на отдельных файлах (занят и т.п.) логируются, старт не прерывается.
 - Построение списка правил — чистая функция (тестируется); применение — тонкая обёртка над `DirectorySecurity`.
 
@@ -165,10 +166,11 @@ WinAdmin.exe network set [--mode local|network] [--port N] [--allow "10.77.77.0/
 
 ## Тесты
 
-Новый проект `tests/WinAdmin.Tests` (xUnit, `Microsoft.AspNetCore.Mvc.Testing`), добавить в `WinAdmin.slnx`.
+Существующий проект `src/tests/WinAdmin.Tests` (xUnit, Moq): добавить ссылку на `WinAdmin.Api` и пакет `Microsoft.AspNetCore.Mvc.Testing`.
 
 - `NetworkSettingsValidator`: порты 0/1/65535/65536; IPv4, IPv6, CIDR, мусор, префикс вне диапазона; `Network` без `Allow`; обрезка и дубликаты.
 - Построение endpoint URL для `Local`/`Network`.
+- Kestrel: реальный `WebApplication` с `NetworkConfigurationSource` перепривязывается на новый порт после перезаписи `network.json`.
 - Первичное создание: порт из `urls` (`http://0.0.0.0:8080`, `http://+:9090`, отсутствует).
 - `FirewallCommands.Build`: `Local` → только delete; `Network` → delete + add с нужными `remoteip`/`profile`.
 - `InstallationHardening` — список правил для папки приложения и данных.
