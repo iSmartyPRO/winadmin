@@ -201,6 +201,10 @@ fn register_service(s: &Settings, log: &dyn Fn(&str)) -> Result<(), String> {
 
 /// Install folder: Administrators/SYSTEM full, Users read; data folder: Administrators/SYSTEM only.
 fn harden_acl(path: &str, users_read: bool, log: &dyn Fn(&str)) {
+    if !crate::settings::is_safe_acl_target(path) {
+        log(&format!("Warning: permissions on {path} left unchanged (shared or root folder)"));
+        return;
+    }
     let _ = Command::new("icacls.exe")
         .args([path, "/reset", "/T", "/C", "/Q"])
         .creation_flags(CREATE_NO_WINDOW)

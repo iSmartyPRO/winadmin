@@ -75,7 +75,8 @@ pub fn network_file() -> PathBuf {
 }
 
 pub fn port_from_network_json(text: &str) -> Option<u16> {
-    let v: serde_json::Value = serde_json::from_str(text).ok()?;
+    // Windows PowerShell 5.1 (Set-Content -Encoding UTF8) writes a BOM.
+    let v: serde_json::Value = serde_json::from_str(text.trim_start_matches('\u{feff}')).ok()?;
     let port = v.get("port")?.as_u64()?;
     u16::try_from(port).ok().filter(|p| *p > 0)
 }
@@ -83,7 +84,7 @@ pub fn port_from_network_json(text: &str) -> Option<u16> {
 /// Sets the port in network.json content, keeping mode/allow; broken or missing → local defaults.
 pub fn merge_network_port(existing: Option<&str>, port: u16) -> String {
     let mut v = existing
-        .and_then(|t| serde_json::from_str::<serde_json::Value>(t).ok())
+        .and_then(|t| serde_json::from_str::<serde_json::Value>(t.trim_start_matches('\u{feff}')).ok())
         .filter(|v| v.is_object())
         .unwrap_or_else(|| serde_json::json!({ "mode": "local", "allow": [] }));
     v["port"] = serde_json::json!(port);
@@ -94,6 +95,22 @@ pub fn merge_network_port(existing: Option<&str>, port: u16) -> String {
         v["allow"] = serde_json::json!([]);
     }
     serde_json::to_string_pretty(&v).unwrap_or_default()
+}
+
+/// Refuses drive roots and shared system folders: icacls /reset /T there would break the machine.
+pub fn is_safe_acl_target(path: &str) -> bool {
+    let norm = path.trim_end_matches(['\\', '/']).to_lowercase();
+    if norm.len() <= 2 {
+        return false; // "c:" or empty
+    }
+    let shared = [
+        r"c:\programdata",
+        r"c:\program files",
+        r"c:\program files (x86)",
+        r"c:\windows",
+        r"c:\users",
+    ];
+    !shared.contains(&norm.as_str())
 }
 
 pub fn write_network_port(port: u16) -> Result<(), String> {
@@ -110,6 +127,26 @@ mod tests {
     #[test]
     fn reads_port_from_network_json() {
         assert_eq!(port_from_network_json(r#"{ "mode": "local", "port": 9090, "allow": [] }"#), Some(9090));
+    }
+
+    #[test]
+    fn refuses_acl_reset_on_roots_and_shared_folders() {
+        assert!(!is_safe_acl_target(r"C:\"));
+        assert!(!is_safe_acl_target(r"C:\ProgramData"));
+        assert!(!is_safe_acl_target(r"C:\Program Files\"));
+        assert!(!is_safe_acl_target(r"c:\windows"));
+        assert!(!is_safe_acl_target(r"C:\Users"));
+        assert!(is_safe_acl_target(r"C:\apps\WinAdmin"));
+        assert!(is_safe_acl_target(r"C:\ProgramData\WinAdmin"));
+    }
+
+    #[test]
+    fn handles_utf8_bom_written_by_windows_powershell() {
+        let with_bom = "\u{feff}{ \"mode\": \"network\", \"port\": 9090, \"allow\": [\"10.0.0.0/8\"] }";
+        assert_eq!(port_from_network_json(with_bom), Some(9090));
+        let v: serde_json::Value = serde_json::from_str(&merge_network_port(Some(with_bom), 9191)).unwrap();
+        assert_eq!(v["mode"], "network");
+        assert_eq!(v["allow"][0], "10.0.0.0/8");
     }
 
     #[test]

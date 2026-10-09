@@ -34,10 +34,27 @@ if (-not (Test-Path $exe)) { throw "Not found: $exe" }
 
 New-Item -ItemType Directory -Force -Path $DataPath | Out-Null
 
+# Refuse drive roots and shared system folders: icacls /reset /T there would break the machine.
+function Test-SafeAclTarget([string]$Path) {
+    $full = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+    if ($full.Length -le 2) { return $false }
+    $shared = @($env:ProgramData, $env:ProgramFiles, ${env:ProgramFiles(x86)}, $env:windir,
+                (Join-Path $env:SystemDrive 'Users')) | Where-Object { $_ }
+    foreach ($s in $shared) {
+        if ($full -ieq $s.TrimEnd('\', '/')) { return $false }
+    }
+    return $true
+}
+foreach ($p in @($InstallPath, $DataPath)) {
+    if (-not (Test-SafeAclTarget $p)) { throw "Refusing to use shared or root folder: $p" }
+}
+
 # ── Network settings (address/port) ──────────────────────────────
 $networkFile = Join-Path $DataPath "network.json"
 if (-not (Test-Path $networkFile)) {
-    @{ mode = "local"; port = $Port; allow = @() } | ConvertTo-Json | Set-Content -Path $networkFile -Encoding UTF8
+    # UTF-8 without BOM (Windows PowerShell 5.1 Set-Content -Encoding UTF8 would add one).
+    $json = @{ mode = "local"; port = $Port; allow = @() } | ConvertTo-Json
+    [IO.File]::WriteAllText($networkFile, $json, (New-Object System.Text.UTF8Encoding $false))
     Write-Host "Created $networkFile (local, port $Port)" -ForegroundColor Green
 } else {
     Write-Host "Keeping existing $networkFile" -ForegroundColor Yellow
