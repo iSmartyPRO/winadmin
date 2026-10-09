@@ -122,6 +122,7 @@ builder.Services.AddWinAdminInfrastructure(database, jwtOptions);
 builder.Services.AddWinAdminNetwork(networkStore);
 builder.Services.AddSingleton(secretProtector);
 builder.Services.AddSingleton<NetworkApplyWatchdog>();
+builder.Services.AddHostedService<WinAdmin.Infrastructure.EnvironmentChecks.EnvironmentMonitor>();
 
 builder.Services
     .AddAuthentication(options =>

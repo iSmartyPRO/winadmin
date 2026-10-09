@@ -1770,7 +1770,7 @@ public sealed class EnvironmentServiceTests
     {
         var sp = new ServiceCollection().AddSingleton(_audit.Object).BuildServiceProvider();
         _modules.Setup(m => m.GetState(It.IsAny<string>())).Returns((string id) =>
-            new ModuleState(id != "off", true, null, new Dictionary<string, object?>()));
+            new ModuleState(id, id != "off", true, null));
         return new EnvironmentService(checks, _modules.Object, sp.GetRequiredService<IServiceScopeFactory>(),
             timeout: TimeSpan.FromMilliseconds(300));
     }

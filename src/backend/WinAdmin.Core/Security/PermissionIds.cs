@@ -25,6 +25,7 @@ public static class PermissionIds
     public const string PlatformAuditRead = "platform.audit.read";
     public const string PlatformNetworkManage = "platform.network.manage";
     public const string PlatformDirectoryManage = "platform.directory.manage";
+    public const string PlatformEnvironmentCheck = "platform.environment.check";
 
     /// <summary>Права ядра (не отключаются вместе с модулями).</summary>
     public static IReadOnlyList<PermissionDefinition> Platform { get; } =
@@ -36,5 +37,6 @@ public static class PermissionIds
         new(PlatformAuditRead, "Журнал аудита", "Просмотр журнала действий"),
         new(PlatformNetworkManage, "Сетевой доступ", "Порт, режим доступа, разрешённые подсети", Dangerous: true),
         new(PlatformDirectoryManage, "Подключение к домену", "Настройки подключения к Active Directory", Dangerous: true),
+        new(PlatformEnvironmentCheck, "Проверка окружения", "Готовность домена, учётки записи и модулей"),
     ];
 }

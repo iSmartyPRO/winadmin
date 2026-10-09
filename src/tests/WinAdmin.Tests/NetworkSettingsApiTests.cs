@@ -68,6 +68,8 @@ public sealed class NetworkApiFactory : WebApplicationFactory<Program>
                 .Callback<DirectorySettings, CancellationToken>((s, _) => DirectorySettings = s.Normalize()).Returns(Task.CompletedTask);
             services.AddSingleton(settings.Object);
             services.AddSingleton<IStartupFilter, TestRemoteIp>();
+            var monitor = services.SingleOrDefault(d => d.ImplementationType == typeof(WinAdmin.Infrastructure.EnvironmentChecks.EnvironmentMonitor));
+            if (monitor is not null) services.Remove(monitor);
             services.RemoveAll<IWindowsSignInReader>();
             services.AddSingleton<IWindowsSignInReader>(Windows);
             // Настоящий NegotiateHandler требует Kestrel (IConnectionItemsFeature) и падает в TestServer.
