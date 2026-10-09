@@ -19,7 +19,7 @@ public static class CliRunner
         string dbPath = WinAdminPaths.DatabasePath(config["WinAdmin:DatabasePath"]);
         string dataDirectory = WinAdminPaths.DataDirectory(dbPath);
         var keys = new MasterKeyStore(Path.Combine(dataDirectory, "keys"));
-        ISecretProtector protector = keys.Exists || args is ["user", ..]
+        ISecretProtector protector = keys.Exists || args is ["user", ..] or ["db", ..] or ["keys", "export", ..]
             ? new AesGcmSecretProtector(keys.LoadOrCreate())
             : new UnavailableSecretProtector($"Ключ шифрования {keys.FilePath} не найден.");
         var databaseStore = new DatabaseSettingsStore(dataDirectory, protector);
@@ -46,7 +46,13 @@ public static class CliRunner
         var networkCommand = new Command("network", "Сетевые настройки панели (порт, режим доступа)");
         NetworkCommands.Register(networkCommand, provider);
 
-        var root = new RootCommand("WinAdmin CLI") { userCommand, networkCommand };
+        var dbCommand = new Command("db", "База данных WinAdmin (SQLite / PostgreSQL)");
+        DbCommands.Register(dbCommand, databaseStore, dbPath);
+
+        var keysCommand = new Command("keys", "Ключ шифрования секретов");
+        KeysCommands.Register(keysCommand, keys);
+
+        var root = new RootCommand("WinAdmin CLI") { userCommand, networkCommand, dbCommand, keysCommand };
         return await root.InvokeAsync(args);
     }
 }

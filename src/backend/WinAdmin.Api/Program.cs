@@ -21,7 +21,7 @@ using WinAdmin.Infrastructure.Secrets;
 using WinAdmin.Infrastructure.Storage;
 
 // ── CLI mode ────────────────────────────────────────────────────
-if (args.Length > 0 && args[0] is "user" or "network")
+if (args.Length > 0 && args[0] is "user" or "network" or "db" or "keys")
 {
     var cliConfig = new ConfigurationBuilder()
         .SetBasePath(AppContext.BaseDirectory)
