@@ -7,9 +7,9 @@ namespace WinAdmin.Infrastructure.ActiveDirectory;
 /// <summary>
 /// Группы пользователя AD для проверки прав на каждом запросе. Свежие (до 5 минут) — из памяти;
 /// старше — перечитываются; домен недоступен — последние известные, пока им меньше 15 минут.
-/// Учётка отключена/удалена → null (сеанс недействителен).
+/// Учётка отключена/удалена или вход доменом выключен → null (сеанс недействителен).
 /// </summary>
-public sealed class AdGroupCache(IDirectoryService directory, TimeProvider? time = null) : IAdGroupCache
+public sealed class AdGroupCache(IDirectoryService directory, IDirectorySettingsStore settings, TimeProvider? time = null) : IAdGroupCache
 {
     public static readonly TimeSpan RefreshAfter = TimeSpan.FromMinutes(5);
     public static readonly TimeSpan StaleLimit = TimeSpan.FromMinutes(15);
@@ -19,6 +19,13 @@ public sealed class AdGroupCache(IDirectoryService directory, TimeProvider? time
 
     public async Task<IReadOnlyList<string>?> GetGroupsAsync(string userSid, CancellationToken ct = default)
     {
+        // Вход доменом выключен администратором — сеансы AD заканчиваются сразу, а не через 5–15 минут.
+        if (!(await settings.GetAsync(ct)).Enabled)
+        {
+            _entries.TryRemove(userSid, out _);
+            return null;
+        }
+
         var now = _time.GetUtcNow();
         bool cached = _entries.TryGetValue(userSid, out var entry);
         if (cached && now - entry.At < RefreshAfter)

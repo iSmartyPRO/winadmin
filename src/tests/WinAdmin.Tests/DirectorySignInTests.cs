@@ -50,7 +50,7 @@ public sealed class DirectorySignInTests : IDisposable
         var settings = new Mock<IDirectorySettingsStore>();
         settings.Setup(s => s.GetAsync(It.IsAny<CancellationToken>())).ReturnsAsync(() => _settings);
         var access = new AccessService(_sp.GetRequiredService<IServiceScopeFactory>(), new PermissionCatalog(BuiltInModules.All));
-        _signIn = new DirectorySignInService(_ad, settings.Object, new AdGroupCache(_ad), access);
+        _signIn = new DirectorySignInService(_ad, settings.Object, new AdGroupCache(_ad, settings.Object), access);
     }
 
     public void Dispose()

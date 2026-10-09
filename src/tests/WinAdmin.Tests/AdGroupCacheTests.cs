@@ -1,3 +1,6 @@
+using Moq;
+using WinAdmin.Core.Abstractions;
+using WinAdmin.Core.ActiveDirectory;
 using WinAdmin.Infrastructure.ActiveDirectory;
 using WinAdmin.Tests.Fakes;
 
@@ -10,12 +13,28 @@ public sealed class AdGroupCacheTests
     private readonly AdGroupCache _cache;
     private readonly string _sid;
     private readonly string _group;
+    private DirectorySettings _settings = new(true, "test.local", null, null, false);
 
     public AdGroupCacheTests()
     {
         _group = _ad.AddGroup("WinAdmin-Helpdesk").Sid;
         _sid = _ad.AddUser("ivan", "pw", _group).Sid;
-        _cache = new AdGroupCache(_ad, _time);
+        _cache = new AdGroupCache(_ad, Settings(), _time);
+    }
+
+    private IDirectorySettingsStore Settings()
+    {
+        var store = new Mock<IDirectorySettingsStore>();
+        store.Setup(s => s.GetAsync(It.IsAny<CancellationToken>())).ReturnsAsync(() => _settings);
+        return store.Object;
+    }
+
+    [Fact]
+    public async Task Switching_directory_off_ends_sessions_immediately()
+    {
+        Assert.NotNull(await _cache.GetGroupsAsync(_sid));
+        _settings = DirectorySettings.Disabled;
+        Assert.Null(await _cache.GetGroupsAsync(_sid)); // кэш свежий, но вход доменом выключен
     }
 
     [Fact]
@@ -57,6 +76,6 @@ public sealed class AdGroupCacheTests
     {
         Assert.Null(await _cache.GetGroupsAsync("S-1-5-21-1-2-3-999"));
         _ad.Down = true;
-        Assert.Null(await new AdGroupCache(_ad, _time).GetGroupsAsync(_sid));
+        Assert.Null(await new AdGroupCache(_ad, Settings(), _time).GetGroupsAsync(_sid));
     }
 }
