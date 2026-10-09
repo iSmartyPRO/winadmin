@@ -2455,11 +2455,11 @@ namespace WinAdmin.Api.Controllers;
 public sealed class DirectoryController(IDirectorySettingsStore settings, IDirectoryService directory, IAuditService audit)
     : WinAdminControllerBase
 {
-    [HttpGet("api/v1/settings/directory")]
+    [HttpGet("/api/v1/settings/directory")]
     [RequirePermission(PermissionIds.PlatformDirectoryManage)]
     public async Task<DirectorySettings> Get(CancellationToken ct) => await settings.GetAsync(ct);
 
-    [HttpPut("api/v1/settings/directory")]
+    [HttpPut("/api/v1/settings/directory")]
     [RequirePermission(PermissionIds.PlatformDirectoryManage)]
     public async Task<DirectorySettings> Put([FromBody] DirectorySettings request, CancellationToken ct)
     {
@@ -2473,11 +2473,11 @@ public sealed class DirectoryController(IDirectorySettingsStore settings, IDirec
         return saved;
     }
 
-    [HttpPost("api/v1/settings/directory/test")]
+    [HttpPost("/api/v1/settings/directory/test")]
     [RequirePermission(PermissionIds.PlatformDirectoryManage)]
     public Task<IReadOnlyList<DirectoryTestStep>> Test(CancellationToken ct) => directory.TestConnectionAsync(ct);
 
-    [HttpGet("api/v1/directory/search")]
+    [HttpGet("/api/v1/directory/search")]
     [RequirePermission(PermissionIds.PlatformRolesManage)]
     public async Task<IActionResult> Search([FromQuery] string q, [FromQuery] string? kind, CancellationToken ct)
     {

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using WinAdmin.Core.Abstractions;
+using WinAdmin.Core.ActiveDirectory;
 using WinAdmin.Core.Models;
 using WinAdmin.Core.Modules;
 using WinAdmin.Core.Security;
@@ -7,7 +8,9 @@ using WinAdmin.Infrastructure.Storage;
 
 namespace WinAdmin.Infrastructure.Access;
 
-public sealed class RoleService(WinAdminDbContext db, PermissionCatalog catalog, IAccessService access, IAuditService audit) : IRoleService
+public sealed class RoleService(
+    WinAdminDbContext db, PermissionCatalog catalog, IAccessService access, IAuditService audit,
+    IDirectoryService? directory = null) : IRoleService
 {
     public async Task<IReadOnlyList<RoleDto>> ListAsync(CancellationToken ct = default)
     {
@@ -224,7 +227,7 @@ public sealed class RoleService(WinAdminDbContext db, PermissionCatalog catalog,
         }
     }
 
-    /// <summary>Активные назначения «Администратор»: пользователь включён, ключ не отозван и не истёк, AD — всегда.</summary>
+    /// <summary>Активные назначения «Администратор»: пользователь включён, ключ не отозван и не истёк, AD — подтверждён каталогом.</summary>
     private async Task<int> CountActiveAdministratorsAsync(string? excludeAssignmentId, CancellationToken ct,
         (string Type, string Id)? excludePrincipal = null)
     {
@@ -240,7 +243,7 @@ public sealed class RoleService(WinAdminDbContext db, PermissionCatalog catalog,
                 nameof(PrincipalType.LocalUser) => await db.Users.AnyAsync(u => u.Id == a.PrincipalId && u.IsActive, ct),
                 nameof(PrincipalType.ApiKey) => (await db.ApiKeys.AsNoTracking().FirstOrDefaultAsync(k => k.Id == a.PrincipalId, ct))
                     is { IsRevoked: false } k && (k.ExpiresAt is null || k.ExpiresAt > now),
-                // До входа через AD (план 1c) такие назначения не дают никому управлять WinAdmin.
+                nameof(PrincipalType.AdUser) or nameof(PrincipalType.AdGroup) => await ConfirmedInDirectoryAsync(a.PrincipalId, ct),
                 _ => false,
             };
             if (isActive) active++;
@@ -262,4 +265,18 @@ public sealed class RoleService(WinAdminDbContext db, PermissionCatalog catalog,
 
     private static RoleAssignmentDto ToDto(RoleAssignmentEntity a) => new(
         a.Id, a.RoleId, a.Role.Name, Enum.Parse<PrincipalType>(a.PrincipalType), a.PrincipalId, a.DisplayName, a.CreatedAt);
+
+    /// <summary>AD-субъект — активный администратор, только если каталог сейчас подтверждает включённую учётку или существующую группу.</summary>
+    private async Task<bool> ConfirmedInDirectoryAsync(string sid, CancellationToken ct)
+    {
+        if (directory is null) return false;
+        try
+        {
+            return await directory.FindBySidAsync(sid, ct) is { Enabled: true };
+        }
+        catch (DirectoryUnavailableException)
+        {
+            return false;
+        }
+    }
 }

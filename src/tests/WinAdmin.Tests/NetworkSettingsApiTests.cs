@@ -65,7 +65,7 @@ public sealed class NetworkApiFactory : WebApplicationFactory<Program>
             var settings = new Mock<IDirectorySettingsStore>();
             settings.Setup(s => s.GetAsync(It.IsAny<CancellationToken>())).ReturnsAsync(() => DirectorySettings);
             settings.Setup(s => s.SaveAsync(It.IsAny<DirectorySettings>(), It.IsAny<CancellationToken>()))
-                .Callback<DirectorySettings, CancellationToken>((s, _) => DirectorySettings = s).Returns(Task.CompletedTask);
+                .Callback<DirectorySettings, CancellationToken>((s, _) => DirectorySettings = s.Normalize()).Returns(Task.CompletedTask);
             services.AddSingleton(settings.Object);
             services.AddSingleton<IStartupFilter, TestRemoteIp>();
             services.RemoveAll<IWindowsSignInReader>();

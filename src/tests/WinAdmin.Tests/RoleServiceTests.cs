@@ -142,14 +142,32 @@ public sealed class RoleServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task Ad_assignment_does_not_count_as_active_administrator_yet()
+    public async Task Ad_assignment_without_directory_is_not_an_active_administrator()
     {
         var local = await AssignAdmin("u-admin");
         await _roles.AssignAsync(new CreateAssignmentRequest(BuiltInRoles.AdministratorId, PrincipalType.AdGroup, "S-1-5-21-1-2-3-512", "Domain Admins"), Admin);
-
-        // Без входа через AD эта группа не может управлять WinAdmin — последнего локального снять нельзя.
         await Assert.ThrowsAsync<InvalidOperationException>(() => _roles.UnassignAsync(local.Id, Admin));
         Assert.Equal(1, await _roles.CountActiveAdministratorsAsync());
+    }
+
+    [Fact]
+    public async Task Ad_assignment_confirmed_by_directory_is_an_active_administrator()
+    {
+        var ad = new Fakes.FakeDirectory();
+        var admins = ad.AddGroup("WinAdmin-Admins");
+        var off = ad.AddUser("off", "x");
+        ad.Disable("off");
+        var roles = new RoleService(_db, Catalog, _access.Object, Mock.Of<IAuditService>(), ad);
+        var local = await AssignAdmin("u-admin");
+        await roles.AssignAsync(new CreateAssignmentRequest(BuiltInRoles.AdministratorId, PrincipalType.AdUser, off.Sid, "off"), Admin);
+        Assert.Equal(1, await roles.CountActiveAdministratorsAsync()); // отключённый в AD не считается
+
+        await roles.AssignAsync(new CreateAssignmentRequest(BuiltInRoles.AdministratorId, PrincipalType.AdGroup, admins.Sid, "WinAdmin-Admins"), Admin);
+        Assert.Equal(2, await roles.CountActiveAdministratorsAsync());
+        await roles.UnassignAsync(local.Id, Admin); // теперь можно
+
+        ad.Down = true;
+        Assert.Equal(0, await roles.CountActiveAdministratorsAsync());
     }
 
     [Fact]

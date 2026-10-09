@@ -28,10 +28,7 @@ public sealed class DirectorySettingsStore(IServiceScopeFactory scopes, IMachine
 
     public async Task SaveAsync(DirectorySettings settings, CancellationToken ct = default)
     {
-        var clean = new DirectorySettings(settings.Enabled, Blank(settings.Domain), Blank(settings.Server),
-            Blank(settings.BaseDn), settings.UseLdaps);
-        if (clean.Enabled && clean.Domain is null)
-            throw new ArgumentException("Укажите домен.");
+        var clean = settings.Normalize();
 
         using var scope = scopes.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<WinAdminDbContext>();
@@ -42,6 +39,4 @@ public sealed class DirectorySettingsStore(IServiceScopeFactory scopes, IMachine
         await db.SaveChangesAsync(ct);
         _cached = clean;
     }
-
-    private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
