@@ -1047,8 +1047,8 @@ public sealed class LdapAdReaderTests
     private static LdapAdReader Real()
     {
         string E(string n) => Environment.GetEnvironmentVariable(n) ?? "";
-        var dir = Mock.Of<IDirectorySettingsStore>(m => m.GetAsync(It.IsAny<CancellationToken>()) ==
-            Task.FromResult(new DirectorySettings(true, E("WINADMIN_TEST_AD_DOMAIN"), E("WINADMIN_TEST_AD_SERVER"), null, false)));
+        var settings = new DirectorySettings(true, E("WINADMIN_TEST_AD_DOMAIN"), E("WINADMIN_TEST_AD_SERVER"), null, false);
+        var dir = Mock.Of<IDirectorySettingsStore>(m => m.GetAsync(It.IsAny<CancellationToken>()) == Task.FromResult(settings));
         var st = new Mock<IAdStructureStore>();
         st.Setup(s => s.GetAsync(It.IsAny<CancellationToken>())).ReturnsAsync(AdStructureSettings.Default with { RootOu = E("WINADMIN_TEST_AD_ROOT") });
         st.Setup(s => s.GetWriteCredentialAsync(It.IsAny<CancellationToken>()))

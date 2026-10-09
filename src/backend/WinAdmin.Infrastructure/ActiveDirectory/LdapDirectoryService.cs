@@ -54,7 +54,7 @@ public sealed class LdapDirectoryService(IDirectorySettingsStore settingsStore, 
         string filter = $"(&(anr={LdapFilter.Escape(query.Trim())}){kindFilter})";
         return await RunAsync((connection, baseDn) =>
         {
-            var response = Search(connection,
+            var response = LdapConnections.Search(connection,
                 new SearchRequest(baseDn, filter, SearchScope.Subtree, Attributes) { SizeLimit = Math.Clamp(limit, 1, 100) });
             return (IReadOnlyList<DirectoryObject>)response.Entries.Cast<SearchResultEntry>().Select(ToObject).OfType<DirectoryObject>().ToList();
         }, ct);
@@ -68,7 +68,7 @@ public sealed class LdapDirectoryService(IDirectorySettingsStore settingsStore, 
         var credential = upn is not null ? new NetworkCredential(upn, password) : new NetworkCredential(sam, password, settings.Domain);
         try
         {
-            using var connection = Connect(settings, credential);
+            using var connection = LdapConnections.Open(settings, credential);
             return true;
         }
         catch (LdapException ex) when (ex.ErrorCode == 49) // invalid credentials
@@ -94,7 +94,7 @@ public sealed class LdapDirectoryService(IDirectorySettingsStore settingsStore, 
         LdapConnection connection;
         try
         {
-            connection = Connect(settings, readCredential);
+            connection = LdapConnections.Open(settings, readCredential);
             steps.Add(new("Подключение", true, "Вход учёткой компьютера выполнен"));
         }
         catch (LdapException ex)
@@ -106,9 +106,9 @@ public sealed class LdapDirectoryService(IDirectorySettingsStore settingsStore, 
         {
             try
             {
-                string baseDn = settings.BaseDn ?? ReadNamingContext(connection);
+                string baseDn = settings.BaseDn ?? LdapConnections.NamingContext(connection);
                 steps.Add(new("Корень каталога", true, baseDn));
-                var response = Search(connection,
+                var response = LdapConnections.Search(connection,
                     new SearchRequest(baseDn, $"(&{UserFilter})", SearchScope.Subtree, "sAMAccountName") { SizeLimit = 1 });
                 steps.Add(new("Поиск", true, response.Entries.Count > 0 ? "Пользователи находятся" : "Пользователи не найдены"));
             }
@@ -123,30 +123,17 @@ public sealed class LdapDirectoryService(IDirectorySettingsStore settingsStore, 
     private Task<DirectoryObject?> FindOneAsync(string filter, CancellationToken ct)
         => RunAsync((connection, baseDn) =>
         {
-            var response = Search(connection, new SearchRequest(baseDn, filter, SearchScope.Subtree, Attributes) { SizeLimit = 2 });
+            var response = LdapConnections.Search(connection, new SearchRequest(baseDn, filter, SearchScope.Subtree, Attributes) { SizeLimit = 2 });
             return response.Entries.Count == 1 ? ToObject(response.Entries[0]) : null;
         }, ct);
-
-    /// <summary>Поиск с лимитом: AD отвечает «size limit exceeded», если записей больше, — это не ошибка, берём частичный ответ.</summary>
-    private static SearchResponse Search(LdapConnection connection, SearchRequest request)
-    {
-        try
-        {
-            return (SearchResponse)connection.SendRequest(request);
-        }
-        catch (DirectoryOperationException ex) when (ex.Response is SearchResponse { ResultCode: ResultCode.SizeLimitExceeded } partial)
-        {
-            return partial;
-        }
-    }
 
     private async Task<T> RunAsync<T>(Func<LdapConnection, string, T> action, CancellationToken ct)
     {
         var settings = await EnabledSettingsAsync(ct);
         try
         {
-            using var connection = Connect(settings, readCredential);
-            return action(connection, settings.BaseDn ?? ReadNamingContext(connection));
+            using var connection = LdapConnections.Open(settings, readCredential);
+            return action(connection, settings.BaseDn ?? LdapConnections.NamingContext(connection));
         }
         catch (LdapException ex)
         {
@@ -160,43 +147,6 @@ public sealed class LdapDirectoryService(IDirectorySettingsStore settingsStore, 
         if (!settings.Enabled || settings.Domain is null)
             throw new DirectoryUnavailableException("Подключение к домену выключено");
         return settings;
-    }
-
-    private static LdapConnection Connect(DirectorySettings s, NetworkCredential? credential)
-    {
-        int port = s.UseLdaps ? 636 : 389;
-        var id = s.Server is null
-            ? new LdapDirectoryIdentifier(s.Domain, port, fullyQualifiedDnsHostName: false, connectionless: false)
-            : new LdapDirectoryIdentifier(s.Server, port);
-        var connection = new LdapConnection(id) { AuthType = AuthType.Negotiate, Timeout = TimeSpan.FromSeconds(10) };
-        connection.SessionOptions.ProtocolVersion = 3;
-        connection.SessionOptions.ReferralChasing = ReferralChasingOptions.None;
-        if (s.UseLdaps)
-            connection.SessionOptions.SecureSocketLayer = true;
-        else
-        {
-            connection.SessionOptions.Signing = true;
-            connection.SessionOptions.Sealing = true;
-        }
-        if (credential is not null) connection.Credential = credential;
-        try
-        {
-            connection.Bind();
-            return connection;
-        }
-        catch
-        {
-            connection.Dispose();
-            throw;
-        }
-    }
-
-    private static string ReadNamingContext(LdapConnection connection)
-    {
-        var response = (SearchResponse)connection.SendRequest(
-            new SearchRequest(null, "(objectClass=*)", SearchScope.Base, "defaultNamingContext"));
-        return response.Entries[0].Attributes["defaultNamingContext"]?[0] as string
-               ?? throw new DirectoryUnavailableException("Не удалось прочитать корень каталога");
     }
 
     private static DirectoryObject? ToObject(SearchResultEntry entry)
