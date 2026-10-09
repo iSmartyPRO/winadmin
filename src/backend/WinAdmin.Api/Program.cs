@@ -43,7 +43,10 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 builder.Host.UseWindowsService();
 
 // ── Конфигурация ────────────────────────────────────────────────
-string dbPath = WinAdminPaths.DatabasePath(builder.Configuration["WinAdmin:DatabasePath"]);
+// Машинная переменная — только для службы (до перезагрузки SCM её не передаёт); при
+// `dotnet run` разработчика она указала бы на рабочую БД установленной службы.
+string dbPath = WinAdminPaths.DatabasePath(builder.Configuration["WinAdmin:DatabasePath"],
+    WindowsServiceHelpers.IsWindowsService() ? WinAdminPaths.MachineDatabasePath : () => null);
 string dataDirectory = WinAdminPaths.DataDirectory(dbPath);
 string connectionString = $"Data Source={dbPath}";
 

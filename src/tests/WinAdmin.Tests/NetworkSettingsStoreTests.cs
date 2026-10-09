@@ -80,7 +80,16 @@ public sealed class NetworkSettingsStoreTests : IDisposable
     public void Paths_resolve_data_directory_from_database_path()
     {
         Assert.Equal(@"C:\ProgramData\WinAdmin", WinAdminPaths.DataDirectory(@"C:\ProgramData\WinAdmin\WinAdmin.db"));
-        Assert.Equal(Path.Combine(AppContext.BaseDirectory, "WinAdmin.db"), WinAdminPaths.DatabasePath(null));
-        Assert.Equal(@"D:\x.db", WinAdminPaths.DatabasePath(@"D:\x.db"));
+        Assert.Equal(Path.Combine(AppContext.BaseDirectory, "WinAdmin.db"), WinAdminPaths.DatabasePath(null, () => null));
+        Assert.Equal(@"D:\x.db", WinAdminPaths.DatabasePath(@"D:\x.db", () => @"C:\other.db"));
+    }
+
+    [Fact]
+    public void Falls_back_to_machine_variable_when_process_has_none()
+    {
+        // Консоль, открытая до установки, и служба до перезагрузки не видят новую
+        // машинную переменную — путь всё равно должен совпасть с тем, что видит служба.
+        Assert.Equal(@"C:\ProgramData\WinAdmin\WinAdmin.db",
+            WinAdminPaths.DatabasePath(null, () => @"C:\ProgramData\WinAdmin\WinAdmin.db"));
     }
 }

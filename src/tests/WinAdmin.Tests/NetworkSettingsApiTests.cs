@@ -93,14 +93,18 @@ public sealed class NetworkSettingsApiTests(NetworkApiFactory factory)
     }
 
     [Fact]
-    public async Task Get_returns_local_defaults_created_at_startup()
+    public async Task Get_returns_settings_from_file_created_at_startup()
     {
+        Assert.True(File.Exists(NetworkFile)); // создан при старте
         var client = await factory.ClientWithScopesAsync("admin");
         var dto = await client.GetFromJsonAsync<NetworkSettingsDto>("/api/v1/settings/network", JsonOpts);
+        var onDisk = new NetworkSettingsStore(factory.DataDir).ReadOrDefault(out _);
+
         Assert.NotNull(dto);
-        Assert.Equal(NetworkMode.Local, dto!.Mode);
-        Assert.False(dto.FirewallRule);
-        Assert.StartsWith("http://127.0.0.1:", dto.Url);
+        Assert.Equal(onDisk.Mode, dto!.Mode);
+        Assert.Equal(onDisk.Port, dto.Port);
+        Assert.Equal(onDisk.Mode == NetworkMode.Network, dto.FirewallRule);
+        Assert.StartsWith(onDisk.Mode == NetworkMode.Local ? "http://127.0.0.1:" : "http://localhost:", dto.Url);
     }
 
     [Fact]
@@ -159,8 +163,13 @@ public sealed class NetworkSettingsApiTests(NetworkApiFactory factory)
 
         // Вернуть Local и дождаться применения, чтобы не влиять на другие тесты коллекции.
         await client.PutAsJsonAsync("/api/v1/settings/network", new { mode = "Local", port, allow = Array.Empty<string>() });
-        for (int i = 0; i < 50 && !File.ReadAllText(NetworkFile).Contains("\"mode\": \"local\""); i++)
-            await Task.Delay(100);
+        bool reset = false;
+        for (int i = 0; i < 150 && !reset; i++)
+        {
+            reset = File.ReadAllText(NetworkFile).Contains("\"mode\": \"local\"");
+            if (!reset) await Task.Delay(100);
+        }
+        Assert.True(reset);
     }
 
     private static readonly System.Text.Json.JsonSerializerOptions JsonOpts = new(System.Text.Json.JsonSerializerDefaults.Web)

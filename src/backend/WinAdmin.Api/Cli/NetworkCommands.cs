@@ -93,7 +93,8 @@ public static class NetworkCommands
                 return;
             }
 
-            output.WriteLine($"Сохранено. Панель: {NetworkEndpoints.PanelUrl(check.Normalized, null)}");
+            output.WriteLine($"Сохранено в {provider.GetRequiredService<NetworkSettingsStore>().FilePath}");
+            output.WriteLine($"Панель: {NetworkEndpoints.PanelUrl(check.Normalized, null)}");
             output.WriteLine("Запущенная служба применит настройки автоматически (без перезапуска).");
         });
         return cmd;
