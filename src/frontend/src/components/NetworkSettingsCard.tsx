@@ -92,23 +92,32 @@ export default function NetworkSettingsCard() {
           <InputNumber min={1} max={65535} style={{ width: 160 }} />
         </Form.Item>
 
+        {/* Поле остаётся в форме и в режиме «Только этот компьютер» (скрыто) — иначе список
+            подсетей не попал бы в запрос и потерялся при переключении туда-обратно. */}
+        <Form.Item
+          name="allow"
+          label="Разрешённые адреса и подсети"
+          extra="Например 10.77.77.0/24 или 192.168.88.5. Остальным брандмауэр закроет доступ."
+          hidden={mode !== 'Network'}
+          rules={[
+            {
+              required: mode === 'Network',
+              type: 'array',
+              min: mode === 'Network' ? 1 : 0,
+              message: 'Укажите хотя бы одну подсеть',
+            },
+          ]}
+        >
+          <Select mode="tags" tokenSeparators={[',', ' ']} placeholder="10.0.0.0/24" open={false} />
+        </Form.Item>
+
         {mode === 'Network' && (
-          <>
-            <Form.Item
-              name="allow"
-              label="Разрешённые адреса и подсети"
-              extra="Например 10.77.77.0/24 или 192.168.88.5. Остальным брандмауэр закроет доступ."
-              rules={[{ required: true, type: 'array', min: 1, message: 'Укажите хотя бы одну подсеть' }]}
-            >
-              <Select mode="tags" tokenSeparators={[',', ' ']} placeholder="10.0.0.0/24" open={false} />
-            </Form.Item>
-            <Alert
-              type="warning"
-              showIcon
-              style={{ marginBottom: 16 }}
-              message="Трафик не шифруется (HTTP). Используйте режим «Сеть» только в доверенной сети."
-            />
-          </>
+          <Alert
+            type="warning"
+            showIcon
+            style={{ marginBottom: 16 }}
+            message="Трафик не шифруется (HTTP). Используйте режим «Сеть» только в доверенной сети."
+          />
         )}
 
         <Form.Item style={{ marginBottom: 0 }}>
