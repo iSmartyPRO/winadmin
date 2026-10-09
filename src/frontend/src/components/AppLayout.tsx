@@ -3,7 +3,7 @@ import {
   DashboardOutlined, HddOutlined, ApiOutlined, AppstoreOutlined,
   PrinterOutlined, PoweroffOutlined, KeyOutlined, FileSearchOutlined,
   BookOutlined, LogoutOutlined, DesktopOutlined, TeamOutlined,
-  FileTextOutlined, SettingOutlined, CodeOutlined, SafetyCertificateOutlined, AppstoreAddOutlined,
+  FileTextOutlined, SettingOutlined, CodeOutlined, SafetyCertificateOutlined, AppstoreAddOutlined, SafetyOutlined,
 } from '@ant-design/icons'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import type { ReactNode } from 'react'
@@ -73,6 +73,7 @@ export default function AppLayout({ machine }: { machine?: string; onLogout: () 
     { key: '/cp/users', icon: <TeamOutlined />, label: 'Пользователи', perm: 'platform.users.manage' },
     { key: '/cp/roles', icon: <SafetyCertificateOutlined />, label: 'Роли', perm: 'platform.roles.manage' },
     { key: '/cp/modules', icon: <AppstoreAddOutlined />, label: 'Модули', perm: 'platform.modules.manage' },
+    { key: '/cp/environment', icon: <SafetyOutlined />, label: 'Проверка окружения', perm: 'platform.environment.check' },
     { key: '/cp/apikeys', icon: <KeyOutlined />, label: 'API-ключи', perm: 'platform.apikeys.manage' },
     { key: '/cp/audit', icon: <FileSearchOutlined />, label: 'Аудит', perm: 'platform.audit.read' },
     { key: '/cp/settings', icon: <SettingOutlined />, label: 'Настройки', perm: ['platform.network.manage', 'eventlogs.manage'] },

@@ -10,6 +10,7 @@ import type {
   ModuleDto, PermissionGroupDto, PrincipalType, RoleAssignmentDto, RoleDto, SaveRoleRequest,
   InstalledApp, InstalledUpdate, SoftwareJob,
   DirectorySettings, DirectoryTestStep, DirectoryEntry,
+  AdStructureSettings, SaveAdStructure, EnvironmentReport,
 } from './types'
 
 // ── JWT storage (sessionStorage — очищается при закрытии вкладки) ──
@@ -140,6 +141,17 @@ export const api = {
     test: () => http.post<DirectoryTestStep[]>('/settings/directory/test').then((r) => r.data),
     search: (q: string, kind: 'user' | 'group') =>
       http.get<DirectoryEntry[]>('/directory/search', { params: { q, kind } }).then((r) => r.data),
+  },
+
+  adStructure: {
+    get: () => http.get<AdStructureSettings>('/settings/ad').then((r) => r.data),
+    save: (s: SaveAdStructure) => http.put<AdStructureSettings>('/settings/ad', s).then((r) => r.data),
+  },
+
+  environment: {
+    run: (depth: 'quick' | 'full' = 'quick', module?: string) =>
+      http.get<EnvironmentReport[]>('/environment', { params: { depth, module } }).then((r) => r.data),
+    latest: () => http.get<EnvironmentReport[]>('/environment/latest').then((r) => r.data),
   },
 
   modules: {

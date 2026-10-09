@@ -337,3 +337,24 @@ export interface DirectoryEntry {
   upn: string | null
   enabled: boolean
 }
+
+export type AdWriteMode = 'ServiceAccount' | 'ProcessAccount'
+
+export interface AdStructureSettings {
+  rootOu: string | null
+  usersOuName: string
+  hiddenOus: string[]
+  writeMode: AdWriteMode
+  writeLogin: string | null
+  hasWritePassword: boolean
+}
+
+export interface SaveAdStructure extends Omit<AdStructureSettings, 'hasWritePassword'> {
+  writePassword?: string | null
+}
+
+export type CheckStatus = 'Ok' | 'Warning' | 'Failed' | 'Skipped'
+
+export interface CheckResult { code: string; title: string; status: CheckStatus; message: string; fix: string | null }
+
+export interface EnvironmentReport { moduleId: string; at: string; overall: CheckStatus; results: CheckResult[] }

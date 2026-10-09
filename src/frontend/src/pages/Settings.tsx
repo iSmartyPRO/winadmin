@@ -6,6 +6,7 @@ import type { ExcludedUserDto } from '../api/types'
 import PageHeader from '../components/PageHeader'
 import NetworkSettingsCard from '../components/NetworkSettingsCard'
 import DirectorySettingsCard from '../components/DirectorySettingsCard'
+import AdStructureCard from '../components/AdStructureCard'
 import { useAuth } from '../auth/AuthProvider'
 
 const { Text, Paragraph } = Typography
@@ -74,6 +75,7 @@ export default function Settings() {
 
       {can('platform.network.manage') && <NetworkSettingsCard />}
       {can('platform.directory.manage') && <DirectorySettingsCard />}
+      {can('platform.directory.manage') && <AdStructureCard />}
 
       {canExcluded && (
       <Card

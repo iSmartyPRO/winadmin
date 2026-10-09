@@ -20,6 +20,7 @@ import EventLogs from './pages/EventLogs'
 import Applications from './pages/Applications'
 import Updates from './pages/Updates'
 import Modules from './pages/Modules'
+import Environment from './pages/Environment'
 import Roles from './pages/Roles'
 
 export default function App() {
@@ -57,6 +58,7 @@ export default function App() {
           <Route path="/cp/settings" element={<Guard perm={['platform.network.manage', 'eventlogs.manage']}><Settings /></Guard>} />
           <Route path="/cp/roles" element={<Guard perm="platform.roles.manage"><Roles /></Guard>} />
           <Route path="/cp/modules" element={<Guard perm="platform.modules.manage"><Modules /></Guard>} />
+          <Route path="/cp/environment" element={<Guard perm="platform.environment.check"><Environment /></Guard>} />
           <Route path="/docs" element={<ApiDocs />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
