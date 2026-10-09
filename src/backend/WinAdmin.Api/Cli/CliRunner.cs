@@ -16,7 +16,7 @@ public static class CliRunner
         // Minimal DI — DB + user service + network settings
         var services = new ServiceCollection();
         string dbPath = WinAdminPaths.DatabasePath(config["WinAdmin:DatabasePath"]);
-        services.AddDbContext<WinAdminDbContext>(o => o.UseSqlite($"Data Source={dbPath}"));
+        services.AddWinAdminDatabase(new DatabaseSettings(DatabaseProvider.Sqlite, $"Data Source={dbPath}"));
         services.AddScoped<IUserService, UserService>();
         services.AddWinAdminNetwork(new NetworkSettingsStore(WinAdminPaths.DataDirectory(dbPath)));
 

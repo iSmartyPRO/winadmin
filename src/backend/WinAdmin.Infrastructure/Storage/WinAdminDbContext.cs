@@ -3,10 +3,15 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace WinAdmin.Infrastructure.Storage;
 
-/// <summary>Локальная база (SQLite): API-ключи и журнал аудита.</summary>
-public sealed class WinAdminDbContext : DbContext
+/// <summary>
+/// База WinAdmin. Модель общая; у каждого провайдера свой наследник со своими миграциями
+/// (<see cref="SqliteWinAdminDbContext"/>, <see cref="PostgresWinAdminDbContext"/>).
+/// </summary>
+public class WinAdminDbContext : DbContext
 {
     public WinAdminDbContext(DbContextOptions<WinAdminDbContext> options) : base(options) { }
+
+    protected WinAdminDbContext(DbContextOptions options) : base(options) { }
 
     public DbSet<ApiKeyEntity> ApiKeys => Set<ApiKeyEntity>();
     public DbSet<AuditEntryEntity> AuditEntries => Set<AuditEntryEntity>();

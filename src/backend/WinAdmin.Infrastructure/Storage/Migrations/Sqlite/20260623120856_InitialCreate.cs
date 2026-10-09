@@ -2,7 +2,7 @@
 
 #nullable disable
 
-namespace WinAdmin.Infrastructure.Storage.Migrations
+namespace WinAdmin.Infrastructure.Storage.Migrations.Sqlite
 {
     /// <inheritdoc />
     public partial class InitialCreate : Migration

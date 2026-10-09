@@ -6,10 +6,10 @@ using WinAdmin.Infrastructure.Storage;
 
 #nullable disable
 
-namespace WinAdmin.Infrastructure.Storage.Migrations
+namespace WinAdmin.Infrastructure.Storage.Migrations.Sqlite
 {
-    [DbContext(typeof(WinAdminDbContext))]
-    partial class WinAdminDbContextModelSnapshot : ModelSnapshot
+    [DbContext(typeof(SqliteWinAdminDbContext))]
+    partial class SqliteWinAdminDbContextModelSnapshot : ModelSnapshot
     {
         protected override void BuildModel(ModelBuilder modelBuilder)
         {

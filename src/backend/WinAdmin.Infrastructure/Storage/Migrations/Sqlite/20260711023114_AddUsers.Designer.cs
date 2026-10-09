@@ -7,11 +7,11 @@ using WinAdmin.Infrastructure.Storage;
 
 #nullable disable
 
-namespace WinAdmin.Infrastructure.Storage.Migrations
+namespace WinAdmin.Infrastructure.Storage.Migrations.Sqlite
 {
-    [DbContext(typeof(WinAdminDbContext))]
-    [Migration("20260623120856_InitialCreate")]
-    partial class InitialCreate
+    [DbContext(typeof(SqliteWinAdminDbContext))]
+    [Migration("20260711023114_AddUsers")]
+    partial class AddUsers
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -94,6 +94,86 @@ namespace WinAdmin.Infrastructure.Storage.Migrations
                     b.HasIndex("Timestamp");
 
                     b.ToTable("AuditEntries");
+                });
+
+            modelBuilder.Entity("WinAdmin.Infrastructure.Storage.RefreshTokenEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("ExpiresAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("RevokedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("RefreshTokens");
+                });
+
+            modelBuilder.Entity("WinAdmin.Infrastructure.Storage.UserEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Login")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Scopes")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Login")
+                        .IsUnique();
+
+                    b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("WinAdmin.Infrastructure.Storage.RefreshTokenEntity", b =>
+                {
+                    b.HasOne("WinAdmin.Infrastructure.Storage.UserEntity", "User")
+                        .WithMany("RefreshTokens")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("WinAdmin.Infrastructure.Storage.UserEntity", b =>
+                {
+                    b.Navigation("RefreshTokens");
                 });
 #pragma warning restore 612, 618
         }

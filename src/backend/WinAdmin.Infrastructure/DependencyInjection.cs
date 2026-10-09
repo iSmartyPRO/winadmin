@@ -1,4 +1,3 @@
-﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using WinAdmin.Core.Abstractions;
 using WinAdmin.Core.Models;
@@ -21,10 +20,10 @@ public static class DependencyInjection
     /// <summary>Регистрирует сбор системной информации, действия и хранилище.</summary>
     public static IServiceCollection AddWinAdminInfrastructure(
         this IServiceCollection services,
-        string sqliteConnectionString,
+        DatabaseSettings database,
         JwtOptions jwtOptions)
     {
-        services.AddDbContext<WinAdminDbContext>(o => o.UseSqlite(sqliteConnectionString));
+        services.AddWinAdminDatabase(database);
 
         services.AddSingleton(jwtOptions);
 

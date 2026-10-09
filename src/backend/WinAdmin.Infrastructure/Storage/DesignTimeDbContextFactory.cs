@@ -1,19 +1,18 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
 namespace WinAdmin.Infrastructure.Storage;
 
-/// <summary>
-/// Используется только инструментами EF (dotnet ef) для создания контекста
-/// во время разработки — чтобы не запускать стартовую логику API.
-/// </summary>
-public sealed class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<WinAdminDbContext>
+/// <summary>Только для dotnet ef (без стартовой логики API).</summary>
+public sealed class SqliteDesignTimeDbContextFactory : IDesignTimeDbContextFactory<SqliteWinAdminDbContext>
 {
-    public WinAdminDbContext CreateDbContext(string[] args)
-    {
-        var options = new DbContextOptionsBuilder<WinAdminDbContext>()
-            .UseSqlite("Data Source=WinAdmin-design.db")
-            .Options;
-        return new WinAdminDbContext(options);
-    }
+    public SqliteWinAdminDbContext CreateDbContext(string[] args)
+        => new(new DbContextOptionsBuilder<SqliteWinAdminDbContext>().UseSqlite("Data Source=WinAdmin-design.db").Options);
+}
+
+/// <summary>Только для dotnet ef; генерация миграций не требует работающего сервера.</summary>
+public sealed class PostgresDesignTimeDbContextFactory : IDesignTimeDbContextFactory<PostgresWinAdminDbContext>
+{
+    public PostgresWinAdminDbContext CreateDbContext(string[] args)
+        => new(new DbContextOptionsBuilder<PostgresWinAdminDbContext>().UseNpgsql("Host=localhost;Database=winadmin_design").Options);
 }

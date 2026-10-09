@@ -99,7 +99,7 @@ builder.Services.AddControllers()
     {
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
-builder.Services.AddWinAdminInfrastructure(connectionString, jwtOptions);
+builder.Services.AddWinAdminInfrastructure(new DatabaseSettings(DatabaseProvider.Sqlite, connectionString), jwtOptions);
 builder.Services.AddWinAdminNetwork(networkStore);
 builder.Services.AddSingleton(secretProtector);
 builder.Services.AddSingleton<NetworkApplyWatchdog>();
