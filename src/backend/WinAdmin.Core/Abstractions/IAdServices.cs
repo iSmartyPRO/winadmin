@@ -75,4 +75,9 @@ public interface IAdUsersService
     Task<AdUserCard> GetAsync(IAccessContext actor, string sam, CancellationToken ct = default);
     Task<byte[]?> GetPhotoAsync(IAccessContext actor, string sam, CancellationToken ct = default);
     Task<IReadOnlyList<AuditEntryDto>> HistoryAsync(IAccessContext actor, string sam, CancellationToken ct = default);
+    Task<AdUserView> UpdateAttributesAsync(IAccessContext actor, string sam, IReadOnlyDictionary<string, string?> changes, CancellationToken ct = default);
+    Task SetPhotoAsync(IAccessContext actor, string sam, byte[]? photo, CancellationToken ct = default);
+    Task<AdUserView> MoveAsync(IAccessContext actor, string sam, string projectDn, CancellationToken ct = default);
+    /// <summary>generate=true — сгенерировать и вернуть; иначе — задать password, вернуть null.</summary>
+    Task<string?> ResetPasswordAsync(IAccessContext actor, string sam, string? password, bool generate, bool mustChange, CancellationToken ct = default);
 }
