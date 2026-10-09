@@ -146,12 +146,21 @@ public sealed class NetworkSettingsApiTests(NetworkApiFactory factory)
         Assert.True(written);
         Assert.Contains(factory.Firewall.Calls, c => c.Any(x => x.Args.Contains("remoteip=10.77.77.0/24")));
 
-        using var scope = factory.Services.CreateScope();
-        var audit = await scope.ServiceProvider.GetRequiredService<IAuditService>().QueryAsync();
-        Assert.Contains(audit, a => a.Action == "settings.network" && a.Success);
+        // Аудит пишется после файла — тоже ждём.
+        bool audited = false;
+        for (int i = 0; i < 50 && !audited; i++)
+        {
+            using var scope = factory.Services.CreateScope();
+            var audit = await scope.ServiceProvider.GetRequiredService<IAuditService>().QueryAsync();
+            audited = audit.Any(a => a.Action == "settings.network" && a.Success);
+            if (!audited) await Task.Delay(100);
+        }
+        Assert.True(audited);
 
-        // Вернуть Local, чтобы не влиять на другие тесты коллекции.
+        // Вернуть Local и дождаться применения, чтобы не влиять на другие тесты коллекции.
         await client.PutAsJsonAsync("/api/v1/settings/network", new { mode = "Local", port, allow = Array.Empty<string>() });
+        for (int i = 0; i < 50 && !File.ReadAllText(NetworkFile).Contains("\"mode\": \"local\""); i++)
+            await Task.Delay(100);
     }
 
     private static readonly System.Text.Json.JsonSerializerOptions JsonOpts = new(System.Text.Json.JsonSerializerDefaults.Web)
