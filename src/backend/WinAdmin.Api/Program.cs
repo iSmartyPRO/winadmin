@@ -5,13 +5,17 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting.WindowsServices;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using WinAdmin.Api.Auth;
+using WinAdmin.Api.Network;
 using WinAdmin.Core.Abstractions;
 using WinAdmin.Core.Models;
+using WinAdmin.Core.Network;
 using WinAdmin.Core.Security;
 using WinAdmin.Infrastructure;
+using WinAdmin.Infrastructure.Network;
 using WinAdmin.Infrastructure.Storage;
 
 // ── CLI mode ────────────────────────────────────────────────────
@@ -38,11 +42,24 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 builder.Host.UseWindowsService();
 
 // ── Конфигурация ────────────────────────────────────────────────
-string? configuredDbPath = builder.Configuration["WinAdmin:DatabasePath"];
-string dbPath = string.IsNullOrWhiteSpace(configuredDbPath)
-    ? Path.Combine(AppContext.BaseDirectory, "WinAdmin.db")
-    : configuredDbPath;
+string dbPath = WinAdminPaths.DatabasePath(builder.Configuration["WinAdmin:DatabasePath"]);
+string dataDirectory = WinAdminPaths.DataDirectory(dbPath);
 string connectionString = $"Data Source={dbPath}";
+
+// Сетевые настройки: network.json рядом с БД → Kestrel:Endpoints (перепривязка на лету).
+// Порт из старого --urls используется только при первом создании файла.
+int? legacyUrlsPort = NetworkEndpoints.PortFromUrls(builder.Configuration["urls"]);
+var networkStore = new NetworkSettingsStore(dataDirectory);
+try
+{
+    networkStore.EnsureCreated(legacyUrlsPort);
+}
+catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+{
+    Console.WriteLine($"Не удалось создать {networkStore.FilePath}: {ex.Message}. Используется 127.0.0.1:{NetworkEndpoints.DefaultPort}.");
+}
+var networkSource = new NetworkConfigurationSource(networkStore);
+builder.Configuration.Sources.Add(networkSource);
 string? bootstrapKey = builder.Configuration["WinAdmin:BootstrapKey"];
 var corsOrigins = builder.Configuration.GetSection("WinAdmin:CorsOrigins").Get<string[]>() ?? [];
 
@@ -66,6 +83,7 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
 builder.Services.AddWinAdminInfrastructure(connectionString, jwtOptions);
+builder.Services.AddWinAdminNetwork(networkStore);
 
 builder.Services
     .AddAuthentication(options =>
@@ -192,10 +210,25 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// ── Конвейер ────────────────────────────────────────────────────
-if (!app.Environment.IsDevelopment())
-    app.UseHttpsRedirection();
+// ── Сеть ─────────────────────────────────────────────────────────
+if (networkSource.Provider?.LastError is { } networkError)
+    app.Logger.LogError("{File}: {Error}. Используются настройки по умолчанию (127.0.0.1:{Port}).",
+        networkStore.FilePath, networkError, NetworkEndpoints.DefaultPort);
 
+if (WindowsServiceHelpers.IsWindowsService())
+{
+    try
+    {
+        var network = app.Services.GetRequiredService<INetworkSettingsService>();
+        network.ApplyFirewall(network.Current, legacyUrlsPort is int p ? [p] : []);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogWarning(ex, "Не удалось привести правило брандмауэра к сетевым настройкам.");
+    }
+}
+
+// ── Конвейер ────────────────────────────────────────────────────
 app.UseSwagger();
 app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "WinAdmin API v1"));
 
