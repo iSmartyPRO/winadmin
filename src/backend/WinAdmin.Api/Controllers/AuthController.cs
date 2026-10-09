@@ -75,15 +75,6 @@ public sealed class AuthController : ControllerBase
         return NoContent();
     }
 
-    /// <summary>Информация о текущем пользователе (требует Bearer token).</summary>
-    [HttpGet("me")]
-    [Authorize]
-    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
-    public IActionResult Me() => Ok(new
-    {
-        login = User.Identity?.Name,
-    });
-
     private void SetRefreshCookie(string raw) =>
         Response.Cookies.Append(RefreshCookie, raw, new CookieOptions
         {

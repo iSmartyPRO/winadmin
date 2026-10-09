@@ -7,56 +7,73 @@ using WinAdmin.Api.Auth;
 
 namespace WinAdmin.Api.Controllers;
 
-/// <summary>Управление пользователями (требует scope admin).</summary>
 [RequirePermission(PermissionIds.PlatformUsersManage)]
+[PlatformErrors]
 [Route("api/v1/users")]
-public sealed class UsersController : WinAdminControllerBase
+public sealed class UsersController(IUserService users, IRoleService roles, AccessContextFactory contexts) : WinAdminControllerBase
 {
-    private readonly IUserService _users;
-
-    public UsersController(IUserService users) => _users = users;
-
-    /// <summary>Список пользователей.</summary>
     [HttpGet]
-    [ProducesResponseType(typeof(IReadOnlyList<UserDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<UserDto>>> List(CancellationToken ct)
-        => Ok(await _users.ListAsync(ct));
-
-    /// <summary>Создать пользователя.</summary>
-    [HttpPost]
-    [ProducesResponseType(typeof(UserDto), StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> Create([FromBody] CreateUserRequest request, CancellationToken ct)
     {
-        try
+        var assignments = await roles.ListAssignmentsAsync(PrincipalType.LocalUser, ct: ct);
+        var list = await users.ListAsync(ct);
+        return Ok(list.Select(u => u with
         {
-            var dto = await _users.CreateAsync(request, ct);
-            return CreatedAtAction(nameof(List), new { }, dto);
-        }
-        catch (Exception ex) when (ex.Message.Contains("UNIQUE") || ex.Message.Contains("unique"))
-        {
-            return Conflict(new { message = $"Пользователь '{request.Login}' уже существует" });
-        }
+            Roles = assignments.Where(a => a.PrincipalId == u.Id).Select(a => a.RoleName).ToList(),
+        }).ToList());
     }
 
-    /// <summary>Сменить пароль.</summary>
+    [HttpPost]
+    public async Task<IActionResult> Create([FromBody] CreateUserRequest request, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.Login) || string.IsNullOrEmpty(request.Password))
+            return BadRequest(new { message = "Укажите логин и пароль." });
+        var actor = await contexts.CreateAsync(User, ct) ?? throw new AccessDeniedException("Не удалось определить пользователя.", []);
+
+        UserDto dto;
+        try
+        {
+            dto = await users.CreateAsync(request, ct);
+        }
+        catch (Exception ex) when (ex.ToString().Contains("UNIQUE") || ex.ToString().Contains("unique"))
+        {
+            return Conflict(new { message = $"Пользователь «{request.Login}» уже существует" });
+        }
+
+        var granted = new List<string>();
+        try
+        {
+            foreach (var roleId in request.RoleIds.Distinct())
+                granted.Add((await roles.AssignAsync(new CreateAssignmentRequest(roleId, PrincipalType.LocalUser, dto.Id, null), actor, ct)).RoleName);
+        }
+        catch
+        {
+            // Роли выдать нельзя — пользователь без ролей не нужен.
+            await roles.RemovePrincipalAsync(PrincipalType.LocalUser, dto.Id, ct);
+            await users.DeleteAsync(dto.Id, ct);
+            throw;
+        }
+        return StatusCode(StatusCodes.Status201Created, dto with { Roles = granted });
+    }
+
     [HttpPut("{id}/password")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ChangePassword(string id, [FromBody] ChangePasswordRequest request, CancellationToken ct)
-        => await _users.ChangePasswordAsync(id, request.NewPassword, ct) ? NoContent() : NotFound();
+        => await users.ChangePasswordAsync(id, request.NewPassword, ct) ? NoContent() : NotFound();
 
-    /// <summary>Активировать / деактивировать.</summary>
     [HttpPut("{id}/active")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> SetActive(string id, [FromBody] SetActiveRequest request, CancellationToken ct)
-        => await _users.SetActiveAsync(id, request.IsActive, ct) ? NoContent() : NotFound();
+    {
+        if (!request.IsActive)
+            await roles.EnsureNotLastAdministratorAsync(PrincipalType.LocalUser, id, ct);
+        return await users.SetActiveAsync(id, request.IsActive, ct) ? NoContent() : NotFound();
+    }
 
-    /// <summary>Удалить пользователя.</summary>
     [HttpDelete("{id}")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(string id, CancellationToken ct)
-        => await _users.DeleteAsync(id, ct) ? NoContent() : NotFound();
+    {
+        await roles.EnsureNotLastAdministratorAsync(PrincipalType.LocalUser, id, ct);
+        if (!await users.DeleteAsync(id, ct)) return NotFound();
+        await roles.RemovePrincipalAsync(PrincipalType.LocalUser, id, ct);
+        return NoContent();
+    }
 }

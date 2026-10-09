@@ -7,54 +7,60 @@ using WinAdmin.Api.Auth;
 
 namespace WinAdmin.Api.Controllers;
 
-/// <summary>Управление API-ключами (требует scope admin).</summary>
 [RequirePermission(PermissionIds.PlatformApiKeysManage)]
+[PlatformErrors]
 [Route("api/v1/apikeys")]
-public sealed class ApiKeysController : WinAdminControllerBase
+public sealed class ApiKeysController(IApiKeyService keys, IAuditService audit, IRoleService roles, AccessContextFactory contexts)
+    : WinAdminControllerBase
 {
-    private readonly IApiKeyService _keys;
-    private readonly IAuditService _audit;
-
-    public ApiKeysController(IApiKeyService keys, IAuditService audit)
+    [HttpGet]
+    public async Task<ActionResult<IReadOnlyList<ApiKeyDto>>> List(CancellationToken ct)
     {
-        _keys = keys;
-        _audit = audit;
+        var assignments = await roles.ListAssignmentsAsync(PrincipalType.ApiKey, ct: ct);
+        var list = await keys.ListAsync(ct);
+        return Ok(list.Select(k => k with
+        {
+            Roles = assignments.Where(a => a.PrincipalId == k.Id).Select(a => a.RoleName).ToList(),
+        }).ToList());
     }
 
-    /// <summary>Список ключей (без секретов).</summary>
-    [HttpGet]
-    [ProducesResponseType(typeof(IReadOnlyList<ApiKeyDto>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<IReadOnlyList<ApiKeyDto>>> List(CancellationToken ct)
-        => Ok(await _keys.ListAsync(ct));
-
-    /// <summary>Создать ключ. Секрет возвращается один раз.</summary>
     [HttpPost]
-    [ProducesResponseType(typeof(CreatedApiKey), StatusCodes.Status201Created)]
     public async Task<IActionResult> Create([FromBody] CreateApiKeyRequest request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Name))
             return BadRequest(OperationResult.Fail("Укажите имя ключа"));
+        if (request.RoleIds.Count == 0)
+            return BadRequest(OperationResult.Fail("Выберите хотя бы одну роль"));
+        var actor = await contexts.CreateAsync(User, ct) ?? throw new AccessDeniedException("Не удалось определить пользователя.", []);
 
-        var created = await _keys.CreateAsync(request, ct);
-        await _audit.WriteAsync(new AuditEntryDto
+        var created = await keys.CreateAsync(request, ct);
+        var granted = new List<string>();
+        try
         {
-            Actor = Actor, Action = "apikey.create", Target = created.Key.Id,
-            Success = true, Details = null, SourceIp = SourceIp,
+            foreach (var roleId in request.RoleIds.Distinct())
+                granted.Add((await roles.AssignAsync(new CreateAssignmentRequest(roleId, PrincipalType.ApiKey, created.Key.Id, null), actor, ct)).RoleName);
+        }
+        catch
+        {
+            await roles.RemovePrincipalAsync(PrincipalType.ApiKey, created.Key.Id, ct);
+            await keys.RevokeAsync(created.Key.Id, ct);
+            throw;
+        }
+
+        await audit.WriteAsync(new AuditEntryDto
+        {
+            Actor = Actor, Action = "apikey.create", Target = created.Key.Id, Success = true,
+            Details = $"роли: {string.Join(", ", granted)}", SourceIp = SourceIp,
         }, ct);
-        return StatusCode(StatusCodes.Status201Created, created);
+        return StatusCode(StatusCodes.Status201Created, created with { Key = created.Key with { Roles = granted } });
     }
 
-    /// <summary>Отозвать ключ.</summary>
     [HttpDelete("{id}")]
-    [ProducesResponseType(typeof(OperationResult), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Revoke(string id, CancellationToken ct)
     {
-        bool ok = await _keys.RevokeAsync(id, ct);
-        await _audit.WriteAsync(new AuditEntryDto
-        {
-            Actor = Actor, Action = "apikey.revoke", Target = id, Success = ok, SourceIp = SourceIp,
-        }, ct);
+        await roles.EnsureNotLastAdministratorAsync(PrincipalType.ApiKey, id, ct);
+        bool ok = await keys.RevokeAsync(id, ct);
+        await audit.WriteAsync(new AuditEntryDto { Actor = Actor, Action = "apikey.revoke", Target = id, Success = ok, SourceIp = SourceIp }, ct);
         return ok ? Ok(OperationResult.Ok("Ключ отозван")) : NotFound();
     }
 }
