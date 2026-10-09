@@ -11,7 +11,7 @@ pub fn register_service_only(s: &Settings, log: &dyn Fn(&str)) -> Result<(), Str
     register_service(s, log)?;
     log(&format!("Starting service {SERVICE_NAME}..."));
     service::start(SERVICE_NAME)?;
-    log(&format!("Done. Service {SERVICE_NAME} is running at http://localhost:{}", s.port));
+    log(&format!("Done. Service {SERVICE_NAME} is running at http://127.0.0.1:{}", s.port));
     Ok(())
 }
 
@@ -46,7 +46,7 @@ pub fn install_or_update(
     service::start(SERVICE_NAME)?;
 
     log(&format!(
-        "Done. WinAdmin {} is ready at http://localhost:{}",
+        "Done. WinAdmin {} is ready at http://127.0.0.1:{}",
         release.version, s.port
     ));
     Ok(())
@@ -102,17 +102,15 @@ pub fn uninstall(s: &Settings, remove_folder: bool, log: &dyn Fn(&str)) -> Resul
     Ok(())
 }
 
+/// Removes the managed rule and the legacy "WinAdmin HTTP <port>" rule (open to any address).
 fn remove_firewall(port: u16, log: &dyn Fn(&str)) {
-    let rule = format!("WinAdmin HTTP {port}");
-    let _ = Command::new("powershell.exe")
-        .args([
-            "-NoProfile",
-            "-Command",
-            &format!("Remove-NetFirewallRule -DisplayName '{rule}' -ErrorAction SilentlyContinue"),
-        ])
-        .creation_flags(CREATE_NO_WINDOW)
-        .output();
-    log(&format!("Firewall rule removed (if present): {rule}"));
+    for rule in ["WinAdmin (managed)".to_string(), format!("WinAdmin HTTP {port}"), "WinAdmin HTTP 8080".to_string()] {
+        let _ = Command::new("netsh.exe")
+            .args(["advfirewall", "firewall", "delete", "rule", &format!("name={rule}")])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output();
+        log(&format!("Firewall rule removed (if present): {rule}"));
+    }
 }
 
 fn extract(zip: &Path, install_path: &str) -> Result<(), String> {
@@ -152,8 +150,11 @@ fn register_service(s: &Settings, log: &dyn Fn(&str)) -> Result<(), String> {
     } else {
         exe_str
     };
-    // sc.exe needs the whole binPath (exe + args) inside one quoted token: binPath= "..."
-    let bin_token = format!("\"{inner} --urls http://0.0.0.0:{}\"", s.port);
+    // sc.exe needs the whole binPath inside one quoted token: binPath= "..."
+    // Address/port come from network.json (no --urls).
+    let bin_token = format!("\"{inner}\"");
+    crate::settings::write_network_port(s.port)?;
+    log(&format!("Port {} written to {}", s.port, crate::settings::network_file().display()));
 
     let mut create = Command::new("sc.exe");
     create.raw_arg("create");
@@ -192,39 +193,26 @@ fn register_service(s: &Settings, log: &dyn Fn(&str)) -> Result<(), String> {
         .output();
     log(&format!("WinAdmin__DatabasePath = {db}"));
 
-    ensure_firewall(s.port, log);
+    remove_firewall(s.port, log);
+    harden_acl(&s.install_path, true, log);
+    harden_acl(DATA_PATH, false, log);
     Ok(())
 }
 
-fn ensure_firewall(port: u16, log: &dyn Fn(&str)) {
-    let rule = format!("WinAdmin HTTP {port}");
-    let check = Command::new("powershell.exe")
-        .args([
-            "-NoProfile",
-            "-Command",
-            &format!(
-                "if (Get-NetFirewallRule -DisplayName '{rule}' -ErrorAction SilentlyContinue) {{ exit 0 }} else {{ exit 1 }}"
-            ),
-        ])
-        .creation_flags(CREATE_NO_WINDOW)
-        .status();
-
-    if let Ok(status) = check {
-        if status.success() {
-            return;
-        }
-    }
-
-    let _ = Command::new("powershell.exe")
-        .args([
-            "-NoProfile",
-            "-Command",
-            &format!(
-                "New-NetFirewallRule -DisplayName '{rule}' -Direction Inbound -Protocol TCP -LocalPort {port} -Action Allow"
-            ),
-        ])
+/// Install folder: Administrators/SYSTEM full, Users read; data folder: Administrators/SYSTEM only.
+fn harden_acl(path: &str, users_read: bool, log: &dyn Fn(&str)) {
+    let _ = Command::new("icacls.exe")
+        .args([path, "/reset", "/T", "/C", "/Q"])
         .creation_flags(CREATE_NO_WINDOW)
         .output();
-
-    log(&format!("Firewall rule added: {rule}"));
+    let mut grant = Command::new("icacls.exe");
+    grant.args([path, "/inheritance:r", "/grant:r", "*S-1-5-32-544:(OI)(CI)F", "*S-1-5-18:(OI)(CI)F"]);
+    if users_read {
+        grant.arg("*S-1-5-32-545:(OI)(CI)RX");
+    }
+    grant.args(["/C", "/Q"]);
+    match grant.creation_flags(CREATE_NO_WINDOW).output() {
+        Ok(out) if out.status.success() => log(&format!("Permissions restricted: {path}")),
+        _ => log(&format!("Warning: could not restrict permissions on {path}")),
+    }
 }

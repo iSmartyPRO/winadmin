@@ -115,8 +115,13 @@ fn wait_for(name: &str, target: Presence) -> Result<(), String> {
     Err("Timeout waiting for the service to reach the desired state.".into())
 }
 
-/// Reads the port from the registered service binary path (--urls http://host:port).
+/// Port of the installed panel: network.json (1.0.6+), else --urls in the service binary path (older installs).
 pub fn installed_port(name: &str) -> Option<u16> {
+    if let Ok(text) = std::fs::read_to_string(crate::settings::network_file()) {
+        if let Some(port) = crate::settings::port_from_network_json(&text) {
+            return Some(port);
+        }
+    }
     let out = sc(&["qc", name]).ok()?;
     let text = String::from_utf8_lossy(&out.stdout);
     let idx = text.find("--urls")?;

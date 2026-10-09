@@ -66,3 +66,76 @@ impl Settings {
         }
     }
 }
+
+pub const NETWORK_FILE: &str = "network.json";
+
+/// network.json in the data folder: { "mode": "local"|"network", "port": N, "allow": [...] }.
+pub fn network_file() -> PathBuf {
+    PathBuf::from(DATA_PATH).join(NETWORK_FILE)
+}
+
+pub fn port_from_network_json(text: &str) -> Option<u16> {
+    let v: serde_json::Value = serde_json::from_str(text).ok()?;
+    let port = v.get("port")?.as_u64()?;
+    u16::try_from(port).ok().filter(|p| *p > 0)
+}
+
+/// Sets the port in network.json content, keeping mode/allow; broken or missing → local defaults.
+pub fn merge_network_port(existing: Option<&str>, port: u16) -> String {
+    let mut v = existing
+        .and_then(|t| serde_json::from_str::<serde_json::Value>(t).ok())
+        .filter(|v| v.is_object())
+        .unwrap_or_else(|| serde_json::json!({ "mode": "local", "allow": [] }));
+    v["port"] = serde_json::json!(port);
+    if v.get("mode").is_none() {
+        v["mode"] = serde_json::json!("local");
+    }
+    if v.get("allow").is_none() {
+        v["allow"] = serde_json::json!([]);
+    }
+    serde_json::to_string_pretty(&v).unwrap_or_default()
+}
+
+pub fn write_network_port(port: u16) -> Result<(), String> {
+    let path = network_file();
+    std::fs::create_dir_all(DATA_PATH).map_err(|e| e.to_string())?;
+    let existing = std::fs::read_to_string(&path).ok();
+    std::fs::write(&path, merge_network_port(existing.as_deref(), port)).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reads_port_from_network_json() {
+        assert_eq!(port_from_network_json(r#"{ "mode": "local", "port": 9090, "allow": [] }"#), Some(9090));
+    }
+
+    #[test]
+    fn rejects_missing_or_invalid_port() {
+        assert_eq!(port_from_network_json(r#"{ "mode": "local" }"#), None);
+        assert_eq!(port_from_network_json(r#"{ "port": 0 }"#), None);
+        assert_eq!(port_from_network_json(r#"{ "port": 70000 }"#), None);
+        assert_eq!(port_from_network_json("not json"), None);
+    }
+
+    #[test]
+    fn merges_port_preserving_mode_and_allow() {
+        let merged = merge_network_port(Some(r#"{ "mode": "network", "port": 8080, "allow": ["10.0.0.0/8"] }"#), 9191);
+        let v: serde_json::Value = serde_json::from_str(&merged).unwrap();
+        assert_eq!(v["mode"], "network");
+        assert_eq!(v["port"], 9191);
+        assert_eq!(v["allow"][0], "10.0.0.0/8");
+    }
+
+    #[test]
+    fn merge_creates_local_defaults_for_missing_or_broken_file() {
+        for input in [None, Some("garbage"), Some("[1,2]")] {
+            let v: serde_json::Value = serde_json::from_str(&merge_network_port(input, 8181)).unwrap();
+            assert_eq!(v["mode"], "local");
+            assert_eq!(v["port"], 8181);
+            assert!(v["allow"].as_array().unwrap().is_empty());
+        }
+    }
+}
