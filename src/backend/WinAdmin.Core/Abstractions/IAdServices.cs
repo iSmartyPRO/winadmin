@@ -1,3 +1,5 @@
+using WinAdmin.Core.Security;
+using WinAdmin.Core.Models;
 using WinAdmin.Core.ActiveDirectory.Users;
 using WinAdmin.Core.ActiveDirectory;
 using WinAdmin.Core.EnvironmentChecks;
@@ -64,4 +66,13 @@ public interface IAdUserDirectory
     /// <summary>SID учётки записи, её групп (tokenGroups) и Everyone / Authenticated Users — для разбора ACL.</summary>
     Task<IReadOnlyList<string>> GetWriterSidsAsync(CancellationToken ct = default);
     Task<byte[]?> ReadSecurityDescriptorAsync(string dn, CancellationToken ct = default);
+}
+
+/// <summary>Модуль «Пользователи AD»: все проверки зоны/области и аудит — внутри.</summary>
+public interface IAdUsersService
+{
+    Task<IReadOnlyList<AdUserView>> ListAsync(IAccessContext actor, string? projectDn, AdUserStatus status, string? q, CancellationToken ct = default);
+    Task<AdUserCard> GetAsync(IAccessContext actor, string sam, CancellationToken ct = default);
+    Task<byte[]?> GetPhotoAsync(IAccessContext actor, string sam, CancellationToken ct = default);
+    Task<IReadOnlyList<AuditEntryDto>> HistoryAsync(IAccessContext actor, string sam, CancellationToken ct = default);
 }

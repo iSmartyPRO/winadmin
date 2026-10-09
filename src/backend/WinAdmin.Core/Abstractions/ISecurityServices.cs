@@ -1,4 +1,4 @@
-﻿using WinAdmin.Core.Models;
+using WinAdmin.Core.Models;
 
 namespace WinAdmin.Core.Abstractions;
 
@@ -19,5 +19,5 @@ public interface IApiKeyService
 public interface IAuditService
 {
     Task WriteAsync(AuditEntryDto entry, CancellationToken ct = default);
-    Task<IReadOnlyList<AuditEntryDto>> QueryAsync(int limit = 200, string? actor = null, CancellationToken ct = default);
+    Task<IReadOnlyList<AuditEntryDto>> QueryAsync(int limit = 200, string? actor = null, string? target = null, CancellationToken ct = default);
 }

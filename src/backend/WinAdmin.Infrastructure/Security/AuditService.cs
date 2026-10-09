@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using WinAdmin.Core.Abstractions;
 using WinAdmin.Core.Models;
 using WinAdmin.Infrastructure.Storage;
@@ -27,11 +27,13 @@ public sealed class AuditService : IAuditService
         await _db.SaveChangesAsync(ct);
     }
 
-    public async Task<IReadOnlyList<AuditEntryDto>> QueryAsync(int limit = 200, string? actor = null, CancellationToken ct = default)
+    public async Task<IReadOnlyList<AuditEntryDto>> QueryAsync(int limit = 200, string? actor = null, string? target = null, CancellationToken ct = default)
     {
         IQueryable<AuditEntryEntity> q = _db.AuditEntries.AsNoTracking();
         if (!string.IsNullOrWhiteSpace(actor))
             q = q.Where(e => e.Actor == actor);
+        if (!string.IsNullOrWhiteSpace(target))
+            q = q.Where(e => e.Target == target);
 
         var rows = await q.OrderByDescending(e => e.Timestamp)
             .Take(Math.Clamp(limit, 1, 2000))

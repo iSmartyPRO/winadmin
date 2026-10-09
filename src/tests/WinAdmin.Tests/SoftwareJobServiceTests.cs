@@ -65,7 +65,7 @@ internal sealed class FakeAudit : IAuditService
         Entries.Add(entry);
     }
 
-    public Task<IReadOnlyList<AuditEntryDto>> QueryAsync(int limit = 200, string? actor = null, CancellationToken ct = default)
+    public Task<IReadOnlyList<AuditEntryDto>> QueryAsync(int limit = 200, string? actor = null, string? target = null, CancellationToken ct = default)
         => Task.FromResult<IReadOnlyList<AuditEntryDto>>(Entries);
 }
 

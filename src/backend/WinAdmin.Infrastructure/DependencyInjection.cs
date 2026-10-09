@@ -60,6 +60,7 @@ public static class DependencyInjection
         services.AddSingleton<IDirectorySettingsStore, DirectorySettingsStore>();
         services.AddSingleton<IAdStructureStore, AdStructureStore>();
         services.AddSingleton<IAdWriter, LdapAdWriter>();
+        services.AddScoped<IAdUsersService, AdUsersService>();
         services.AddSingleton<IAdUserDirectory>(sp => new LdapAdUserDirectory(
             sp.GetRequiredService<IDirectorySettingsStore>(), sp.GetRequiredService<IAdStructureStore>()));
         services.AddSingleton<IEnvironmentService, EnvironmentService>();

@@ -20,5 +20,5 @@ public sealed class AuditController : WinAdminControllerBase
     [ProducesResponseType(typeof(IReadOnlyList<AuditEntryDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<AuditEntryDto>>> Get(
         [FromQuery] int limit = 200, [FromQuery] string? actor = null, CancellationToken ct = default)
-        => Ok(await _audit.QueryAsync(limit, actor, ct));
+        => Ok(await _audit.QueryAsync(limit, actor, ct: ct));
 }
