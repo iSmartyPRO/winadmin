@@ -40,17 +40,17 @@
 
 | Файл | Ответственность |
 |---|---|
-| `src/backend/WinAdmin.Core/Directory/DirectoryModels.cs` | `DirectorySettings`, `DirectoryObject`, `DirectoryObjectKind`, `DirectoryTestStep`, `DirectoryUnavailableException` |
-| `src/backend/WinAdmin.Core/Directory/DirectoryLogin.cs` | разбор логина `DOMAIN\u` / `u@d` / `u` |
-| `src/backend/WinAdmin.Core/Directory/LdapFilter.cs` | экранирование значений фильтра (RFC 4515), SID → фильтр |
+| `src/backend/WinAdmin.Core/ActiveDirectory/DirectoryModels.cs` | `DirectorySettings`, `DirectoryObject`, `DirectoryObjectKind`, `DirectoryTestStep`, `DirectoryUnavailableException` |
+| `src/backend/WinAdmin.Core/ActiveDirectory/DirectoryLogin.cs` | разбор логина `DOMAIN\u` / `u@d` / `u` |
+| `src/backend/WinAdmin.Core/ActiveDirectory/LdapFilter.cs` | экранирование значений фильтра (RFC 4515), SID → фильтр |
 | `src/backend/WinAdmin.Core/Abstractions/IDirectoryService.cs` | `IDirectoryService`, `IDirectorySettingsStore`, `IAdGroupCache`, `IDirectorySignIn` |
 | `src/backend/WinAdmin.Infrastructure/Storage/WinAdminDbContext.cs` | + `PlatformSettingEntity`, `DirectoryRefreshTokenEntity` |
 | `src/backend/WinAdmin.Infrastructure/Storage/Migrations/{Sqlite,PostgreSql}/*_AddDirectoryLogin.cs` | миграции |
-| `src/backend/WinAdmin.Infrastructure/Directory/DirectorySettingsStore.cs` | настройки домена в `PlatformSettings` (ключ `directory`), умолчания от машины |
-| `src/backend/WinAdmin.Infrastructure/Directory/LdapDirectoryService.cs` | LDAP через S.DS.Protocols |
-| `src/backend/WinAdmin.Infrastructure/Directory/LdapMapping.cs` | чистые функции: SID из байтов, флаг Enabled |
-| `src/backend/WinAdmin.Infrastructure/Directory/AdGroupCache.cs` | группы по SID: 5 мин / 15 мин |
-| `src/backend/WinAdmin.Infrastructure/Directory/DirectorySignInService.cs` | пароль → SID → группы → права |
+| `src/backend/WinAdmin.Infrastructure/ActiveDirectory/DirectorySettingsStore.cs` | настройки домена в `PlatformSettings` (ключ `directory`), умолчания от машины |
+| `src/backend/WinAdmin.Infrastructure/ActiveDirectory/LdapDirectoryService.cs` | LDAP через S.DS.Protocols |
+| `src/backend/WinAdmin.Infrastructure/ActiveDirectory/LdapMapping.cs` | чистые функции: SID из байтов, флаг Enabled |
+| `src/backend/WinAdmin.Infrastructure/ActiveDirectory/AdGroupCache.cs` | группы по SID: 5 мин / 15 мин |
+| `src/backend/WinAdmin.Infrastructure/ActiveDirectory/DirectorySignInService.cs` | пароль → SID → группы → права |
 | `src/backend/WinAdmin.Infrastructure/Security/TokenService.cs` | + JWT и refresh для AD |
 | `src/backend/WinAdmin.Api/Auth/LoginThrottle.cs` | лимит неудачных входов |
 | `src/backend/WinAdmin.Api/Auth/LoginTransport.cs` | loopback/HTTPS |
@@ -68,9 +68,9 @@
 ### Task 1: Контракты каталога, разбор логина, экранирование LDAP
 
 **Files:**
-- Create: `src/backend/WinAdmin.Core/Directory/DirectoryModels.cs`
-- Create: `src/backend/WinAdmin.Core/Directory/DirectoryLogin.cs`
-- Create: `src/backend/WinAdmin.Core/Directory/LdapFilter.cs`
+- Create: `src/backend/WinAdmin.Core/ActiveDirectory/DirectoryModels.cs`
+- Create: `src/backend/WinAdmin.Core/ActiveDirectory/DirectoryLogin.cs`
+- Create: `src/backend/WinAdmin.Core/ActiveDirectory/LdapFilter.cs`
 - Create: `src/backend/WinAdmin.Core/Abstractions/IDirectoryService.cs`
 - Test: `src/tests/WinAdmin.Tests/DirectoryLoginTests.cs`
 
@@ -89,7 +89,7 @@
 
 ```csharp
 // src/tests/WinAdmin.Tests/DirectoryLoginTests.cs
-using WinAdmin.Core.Directory;
+using WinAdmin.Core.ActiveDirectory;
 
 namespace WinAdmin.Tests;
 
@@ -144,8 +144,8 @@ Expected: FAIL — ошибка компиляции «Имя "DirectoryLogin" �
 - [ ] **Step 3: Write minimal implementation**
 
 ```csharp
-// src/backend/WinAdmin.Core/Directory/DirectoryModels.cs
-namespace WinAdmin.Core.Directory;
+// src/backend/WinAdmin.Core/ActiveDirectory/DirectoryModels.cs
+namespace WinAdmin.Core.ActiveDirectory;
 
 /// <summary>Подключение к домену. Server пусто — поиск контроллера через DNS; BaseDn пусто — defaultNamingContext.</summary>
 public sealed record DirectorySettings(bool Enabled, string? Domain, string? Server, string? BaseDn, bool UseLdaps)
@@ -171,8 +171,8 @@ public sealed class DirectoryUnavailableException(string message, Exception? inn
 ```
 
 ```csharp
-// src/backend/WinAdmin.Core/Directory/DirectoryLogin.cs
-namespace WinAdmin.Core.Directory;
+// src/backend/WinAdmin.Core/ActiveDirectory/DirectoryLogin.cs
+namespace WinAdmin.Core.ActiveDirectory;
 
 public static class DirectoryLogin
 {
@@ -192,11 +192,11 @@ public static class DirectoryLogin
 ```
 
 ```csharp
-// src/backend/WinAdmin.Core/Directory/LdapFilter.cs
+// src/backend/WinAdmin.Core/ActiveDirectory/LdapFilter.cs
 using System.Security.Principal;
 using System.Text;
 
-namespace WinAdmin.Core.Directory;
+namespace WinAdmin.Core.ActiveDirectory;
 
 /// <summary>Значения для LDAP-фильтров (RFC 4515).</summary>
 public static class LdapFilter
@@ -237,7 +237,7 @@ public static class LdapFilter
 
 ```csharp
 // src/backend/WinAdmin.Core/Abstractions/IDirectoryService.cs
-using WinAdmin.Core.Directory;
+using WinAdmin.Core.ActiveDirectory;
 
 namespace WinAdmin.Core.Abstractions;
 
@@ -300,7 +300,7 @@ git commit -m "feat(directory): contracts, login parsing and LDAP filter escapin
 - Create: migrations `AddDirectoryLogin` (Sqlite + PostgreSql)
 - Modify: `src/backend/WinAdmin.Core/Abstractions/IMachineInfo.cs` (+ `string? DomainName`)
 - Modify: `src/backend/WinAdmin.Infrastructure/MachineInfo/WmiMachineInfo.cs`
-- Create: `src/backend/WinAdmin.Infrastructure/Directory/DirectorySettingsStore.cs`
+- Create: `src/backend/WinAdmin.Infrastructure/ActiveDirectory/DirectorySettingsStore.cs`
 - Modify: `src/backend/WinAdmin.Infrastructure/DependencyInjection.cs`
 - Test: `src/tests/WinAdmin.Tests/DirectorySettingsStoreTests.cs`
 
@@ -321,8 +321,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using WinAdmin.Core.Abstractions;
-using WinAdmin.Core.Directory;
-using WinAdmin.Infrastructure.Directory;
+using WinAdmin.Core.ActiveDirectory;
+using WinAdmin.Infrastructure.ActiveDirectory;
 using WinAdmin.Infrastructure.Storage;
 
 namespace WinAdmin.Tests;
@@ -474,15 +474,15 @@ dotnet ef migrations add AddDirectoryLogin --project src/backend/WinAdmin.Infras
 Expected: `Done.` дважды; миграции содержат только `CreateTable` для `PlatformSettings` и `DirectoryRefreshTokens` + индексы. Если снимок модели оказался в `src/backend/WinAdmin.Infrastructure/WinAdmin/…` — перенести поверх существующего в `Storage/Migrations/...` и удалить лишний каталог.
 
 ```csharp
-// src/backend/WinAdmin.Infrastructure/Directory/DirectorySettingsStore.cs
+// src/backend/WinAdmin.Infrastructure/ActiveDirectory/DirectorySettingsStore.cs
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using WinAdmin.Core.Abstractions;
-using WinAdmin.Core.Directory;
+using WinAdmin.Core.ActiveDirectory;
 using WinAdmin.Infrastructure.Storage;
 
-namespace WinAdmin.Infrastructure.Directory;
+namespace WinAdmin.Infrastructure.ActiveDirectory;
 
 /// <summary>Настройки подключения к домену (PlatformSettings, ключ «directory»); без записи — по машине.</summary>
 public sealed class DirectorySettingsStore(IServiceScopeFactory scopes, IMachineInfo machine) : IDirectorySettingsStore
@@ -548,8 +548,8 @@ git commit -m "feat(directory): platform settings table, AD refresh tokens, dire
 
 **Files:**
 - Modify: `src/backend/WinAdmin.Infrastructure/WinAdmin.Infrastructure.csproj` (+ `System.DirectoryServices.Protocols` 10.0.9)
-- Create: `src/backend/WinAdmin.Infrastructure/Directory/LdapMapping.cs`
-- Create: `src/backend/WinAdmin.Infrastructure/Directory/LdapDirectoryService.cs`
+- Create: `src/backend/WinAdmin.Infrastructure/ActiveDirectory/LdapMapping.cs`
+- Create: `src/backend/WinAdmin.Infrastructure/ActiveDirectory/LdapDirectoryService.cs`
 - Modify: `src/backend/WinAdmin.Infrastructure/DependencyInjection.cs`
 - Test: `src/tests/WinAdmin.Tests/LdapDirectoryServiceTests.cs`, `src/tests/WinAdmin.Tests/AdFactAttribute.cs`
 
@@ -582,8 +582,8 @@ public sealed class AdFactAttribute : FactAttribute
 using System.Net;
 using Moq;
 using WinAdmin.Core.Abstractions;
-using WinAdmin.Core.Directory;
-using WinAdmin.Infrastructure.Directory;
+using WinAdmin.Core.ActiveDirectory;
+using WinAdmin.Infrastructure.ActiveDirectory;
 
 namespace WinAdmin.Tests;
 
@@ -671,10 +671,10 @@ dotnet add src/backend/WinAdmin.Infrastructure package System.DirectoryServices.
 ```
 
 ```csharp
-// src/backend/WinAdmin.Infrastructure/Directory/LdapMapping.cs
+// src/backend/WinAdmin.Infrastructure/ActiveDirectory/LdapMapping.cs
 using System.Security.Principal;
 
-namespace WinAdmin.Infrastructure.Directory;
+namespace WinAdmin.Infrastructure.ActiveDirectory;
 
 public static class LdapMapping
 {
@@ -688,13 +688,13 @@ public static class LdapMapping
 ```
 
 ```csharp
-// src/backend/WinAdmin.Infrastructure/Directory/LdapDirectoryService.cs
+// src/backend/WinAdmin.Infrastructure/ActiveDirectory/LdapDirectoryService.cs
 using System.DirectoryServices.Protocols;
 using System.Net;
 using WinAdmin.Core.Abstractions;
-using WinAdmin.Core.Directory;
+using WinAdmin.Core.ActiveDirectory;
 
-namespace WinAdmin.Infrastructure.Directory;
+namespace WinAdmin.Infrastructure.ActiveDirectory;
 
 /// <summary>
 /// AD через LDAP: Negotiate с подписью и шифрованием (389) или LDAPS (636).
@@ -923,7 +923,7 @@ git commit -m "feat(directory): LDAP directory service with signing/sealing and 
 ### Task 4: AdGroupCache — группы по SID (5 минут / 15 минут)
 
 **Files:**
-- Create: `src/backend/WinAdmin.Infrastructure/Directory/AdGroupCache.cs`
+- Create: `src/backend/WinAdmin.Infrastructure/ActiveDirectory/AdGroupCache.cs`
 - Create: `src/tests/WinAdmin.Tests/Fakes/FakeDirectory.cs`
 - Modify: `src/backend/WinAdmin.Infrastructure/DependencyInjection.cs`
 - Test: `src/tests/WinAdmin.Tests/AdGroupCacheTests.cs`
@@ -937,7 +937,7 @@ git commit -m "feat(directory): LDAP directory service with signing/sealing and 
 ```csharp
 // src/tests/WinAdmin.Tests/Fakes/FakeDirectory.cs
 using WinAdmin.Core.Abstractions;
-using WinAdmin.Core.Directory;
+using WinAdmin.Core.ActiveDirectory;
 
 namespace WinAdmin.Tests.Fakes;
 
@@ -1018,7 +1018,7 @@ public sealed class FakeDirectory : IDirectoryService
 
 ```csharp
 // src/tests/WinAdmin.Tests/AdGroupCacheTests.cs
-using WinAdmin.Infrastructure.Directory;
+using WinAdmin.Infrastructure.ActiveDirectory;
 using WinAdmin.Tests.Fakes;
 
 namespace WinAdmin.Tests;
@@ -1090,12 +1090,12 @@ Expected: FAIL — компиляция: нет `AdGroupCache`.
 - [ ] **Step 3: Write minimal implementation**
 
 ```csharp
-// src/backend/WinAdmin.Infrastructure/Directory/AdGroupCache.cs
+// src/backend/WinAdmin.Infrastructure/ActiveDirectory/AdGroupCache.cs
 using System.Collections.Concurrent;
 using WinAdmin.Core.Abstractions;
-using WinAdmin.Core.Directory;
+using WinAdmin.Core.ActiveDirectory;
 
-namespace WinAdmin.Infrastructure.Directory;
+namespace WinAdmin.Infrastructure.ActiveDirectory;
 
 /// <summary>
 /// Группы пользователя AD для проверки прав на каждом запросе. Свежие (до 5 минут) — из памяти;
@@ -1162,7 +1162,7 @@ git commit -m "feat(directory): AD group cache with 5/15 minute refresh and fall
 ### Task 5: DirectorySignInService и токены AD
 
 **Files:**
-- Create: `src/backend/WinAdmin.Infrastructure/Directory/DirectorySignInService.cs`
+- Create: `src/backend/WinAdmin.Infrastructure/ActiveDirectory/DirectorySignInService.cs`
 - Modify: `src/backend/WinAdmin.Core/Abstractions/ITokenService.cs`
 - Modify: `src/backend/WinAdmin.Infrastructure/Security/TokenService.cs`
 - Modify: `src/backend/WinAdmin.Infrastructure/DependencyInjection.cs`
@@ -1186,11 +1186,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using WinAdmin.Core.Abstractions;
-using WinAdmin.Core.Directory;
+using WinAdmin.Core.ActiveDirectory;
 using WinAdmin.Core.Modules;
 using WinAdmin.Core.Security;
 using WinAdmin.Infrastructure.Access;
-using WinAdmin.Infrastructure.Directory;
+using WinAdmin.Infrastructure.ActiveDirectory;
 using WinAdmin.Infrastructure.Security;
 using WinAdmin.Infrastructure.Storage;
 using WinAdmin.Tests.Fakes;
@@ -1320,12 +1320,12 @@ Expected: FAIL — компиляция: нет `DirectorySignInService`, `Creat
 - [ ] **Step 3: Write minimal implementation**
 
 ```csharp
-// src/backend/WinAdmin.Infrastructure/Directory/DirectorySignInService.cs
+// src/backend/WinAdmin.Infrastructure/ActiveDirectory/DirectorySignInService.cs
 using WinAdmin.Core.Abstractions;
-using WinAdmin.Core.Directory;
+using WinAdmin.Core.ActiveDirectory;
 using WinAdmin.Core.Security;
 
-namespace WinAdmin.Infrastructure.Directory;
+namespace WinAdmin.Infrastructure.ActiveDirectory;
 
 /// <summary>Пароль → bind → SID → группы → права. Нет ни одного права — NoAccess.</summary>
 public sealed class DirectorySignInService(
@@ -1387,7 +1387,7 @@ public sealed class DirectorySignInService(
     Task<string?> ValidateDirectoryRefreshTokenAsync(string rawToken, CancellationToken ct = default);
 ```
 
-(`using WinAdmin.Core.Directory;`)
+(`using WinAdmin.Core.ActiveDirectory;`)
 
 `TokenService` — вынести построение JWT в общий метод и добавить AD:
 
@@ -1555,7 +1555,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Microsoft.Extensions.DependencyInjection;
 using WinAdmin.Core.Abstractions;
-using WinAdmin.Core.Directory;
+using WinAdmin.Core.ActiveDirectory;
 using WinAdmin.Core.Models;
 using WinAdmin.Core.Security;
 
@@ -2154,7 +2154,7 @@ using System.Net.Http.Json;
 using Microsoft.Extensions.DependencyInjection;
 using WinAdmin.Api.Auth;
 using WinAdmin.Core.Abstractions;
-using WinAdmin.Core.Directory;
+using WinAdmin.Core.ActiveDirectory;
 using WinAdmin.Core.Models;
 using WinAdmin.Core.Security;
 
@@ -2329,7 +2329,7 @@ git commit -m "feat(auth): Kerberos SSO endpoint and login options"
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using WinAdmin.Core.Directory;
+using WinAdmin.Core.ActiveDirectory;
 using WinAdmin.Core.Security;
 
 namespace WinAdmin.Tests;
@@ -2441,7 +2441,7 @@ Expected: FAIL — 404 на `/api/v1/settings/directory`; компиляция: 
 using Microsoft.AspNetCore.Mvc;
 using WinAdmin.Api.Auth;
 using WinAdmin.Core.Abstractions;
-using WinAdmin.Core.Directory;
+using WinAdmin.Core.ActiveDirectory;
 using WinAdmin.Core.Models;
 using WinAdmin.Core.Security;
 
