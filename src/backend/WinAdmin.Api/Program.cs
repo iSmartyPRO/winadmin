@@ -17,6 +17,7 @@ using WinAdmin.Core.Security;
 using WinAdmin.Infrastructure;
 using WinAdmin.Infrastructure.Hardening;
 using WinAdmin.Infrastructure.Network;
+using WinAdmin.Infrastructure.Secrets;
 using WinAdmin.Infrastructure.Storage;
 
 // ── CLI mode ────────────────────────────────────────────────────
@@ -48,6 +49,19 @@ builder.Host.UseWindowsService();
 string dbPath = WinAdminPaths.DatabasePath(builder.Configuration["WinAdmin:DatabasePath"],
     WindowsServiceHelpers.IsWindowsService() ? WinAdminPaths.MachineDatabasePath : () => null);
 string dataDirectory = WinAdminPaths.DataDirectory(dbPath);
+
+// Ключ шифрования секретов (keys\master.key под DPAPI машины).
+string keysDirectory = Path.Combine(dataDirectory, "keys");
+ISecretProtector secretProtector;
+try
+{
+    secretProtector = new AesGcmSecretProtector(new MasterKeyStore(keysDirectory).LoadOrCreate());
+}
+catch (Exception ex) when (ex is SecretUnavailableException or IOException or UnauthorizedAccessException)
+{
+    Console.WriteLine($"Ключ шифрования недоступен: {ex.Message}");
+    secretProtector = new UnavailableSecretProtector(ex.Message);
+}
 string connectionString = $"Data Source={dbPath}";
 
 // Сетевые настройки: network.json рядом с БД → Kestrel:Endpoints (перепривязка на лету).
@@ -68,16 +82,15 @@ string? bootstrapKey = builder.Configuration["WinAdmin:BootstrapKey"];
 var corsOrigins = builder.Configuration.GetSection("WinAdmin:CorsOrigins").Get<string[]>() ?? [];
 
 var jwtOptions = builder.Configuration.GetSection("WinAdmin:Jwt").Get<JwtOptions>() ?? new JwtOptions();
-if (string.IsNullOrWhiteSpace(jwtOptions.Secret))
+try
 {
-    var bytes = new byte[32];
-    System.Security.Cryptography.RandomNumberGenerator.Fill(bytes);
-    jwtOptions.Secret = Convert.ToBase64String(bytes);
-    Console.WriteLine("════════════════════════════════════════════════════");
-    Console.WriteLine("JWT Secret не задан — используется временный ключ.");
-    Console.WriteLine("При перезапуске все сессии будут сброшены.");
-    Console.WriteLine($"Задайте переменную окружения: WinAdmin__Jwt__Secret={jwtOptions.Secret}");
-    Console.WriteLine("════════════════════════════════════════════════════");
+    jwtOptions.Secret = JwtSecretStore.Resolve(jwtOptions.Secret,
+        () => new JwtSecretStore(keysDirectory, secretProtector).GetOrCreate());
+}
+catch (Exception ex) when (ex is SecretUnavailableException or IOException or UnauthorizedAccessException)
+{
+    jwtOptions.Secret = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+    Console.WriteLine($"JWT-секрет не сохранён ({ex.Message}) — используется временный, сессии сбросятся при перезапуске.");
 }
 
 // ── Сервисы ─────────────────────────────────────────────────────
@@ -88,6 +101,7 @@ builder.Services.AddControllers()
     });
 builder.Services.AddWinAdminInfrastructure(connectionString, jwtOptions);
 builder.Services.AddWinAdminNetwork(networkStore);
+builder.Services.AddSingleton(secretProtector);
 builder.Services.AddSingleton<NetworkApplyWatchdog>();
 
 builder.Services

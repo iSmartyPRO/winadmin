@@ -85,6 +85,14 @@ public sealed class NetworkSettingsApiTests(NetworkApiFactory factory)
     }
 
     [Fact]
+    public async Task Startup_creates_encryption_and_jwt_keys()
+    {
+        await factory.CreateClient().GetAsync("/health"); // гарантирует, что хост построен
+        Assert.True(File.Exists(Path.Combine(factory.DataDir, "keys", "master.key")));
+        Assert.True(File.Exists(Path.Combine(factory.DataDir, "keys", "jwt.key")));
+    }
+
+    [Fact]
     public async Task Requires_admin_scope()
     {
         var client = await factory.ClientWithScopesAsync("system.read");
