@@ -54,10 +54,8 @@ public sealed class LdapDirectoryService(IDirectorySettingsStore settingsStore, 
         string filter = $"(&(anr={LdapFilter.Escape(query.Trim())}){kindFilter})";
         return await RunAsync((connection, baseDn) =>
         {
-            var request = new SearchRequest(baseDn, filter, SearchScope.Subtree, Attributes) { SizeLimit = Math.Clamp(limit, 1, 100) };
-            SearchResponse response;
-            try { response = (SearchResponse)connection.SendRequest(request); }
-            catch (DirectoryOperationException ex) when (ex.Response is SearchResponse partial) { response = partial; }
+            var response = Search(connection,
+                new SearchRequest(baseDn, filter, SearchScope.Subtree, Attributes) { SizeLimit = Math.Clamp(limit, 1, 100) });
             return (IReadOnlyList<DirectoryObject>)response.Entries.Cast<SearchResultEntry>().Select(ToObject).OfType<DirectoryObject>().ToList();
         }, ct);
     }
@@ -110,9 +108,9 @@ public sealed class LdapDirectoryService(IDirectorySettingsStore settingsStore, 
             {
                 string baseDn = settings.BaseDn ?? ReadNamingContext(connection);
                 steps.Add(new("Корень каталога", true, baseDn));
-                var response = (SearchResponse)connection.SendRequest(
+                var response = Search(connection,
                     new SearchRequest(baseDn, $"(&{UserFilter})", SearchScope.Subtree, "sAMAccountName") { SizeLimit = 1 });
-                steps.Add(new("Поиск", true, $"Найдено записей: {response.Entries.Count}"));
+                steps.Add(new("Поиск", true, response.Entries.Count > 0 ? "Пользователи находятся" : "Пользователи не найдены"));
             }
             catch (Exception ex) when (ex is LdapException or DirectoryOperationException)
             {
@@ -125,10 +123,22 @@ public sealed class LdapDirectoryService(IDirectorySettingsStore settingsStore, 
     private Task<DirectoryObject?> FindOneAsync(string filter, CancellationToken ct)
         => RunAsync((connection, baseDn) =>
         {
-            var response = (SearchResponse)connection.SendRequest(
-                new SearchRequest(baseDn, filter, SearchScope.Subtree, Attributes) { SizeLimit = 2 });
+            var response = Search(connection, new SearchRequest(baseDn, filter, SearchScope.Subtree, Attributes) { SizeLimit = 2 });
             return response.Entries.Count == 1 ? ToObject(response.Entries[0]) : null;
         }, ct);
+
+    /// <summary>Поиск с лимитом: AD отвечает «size limit exceeded», если записей больше, — это не ошибка, берём частичный ответ.</summary>
+    private static SearchResponse Search(LdapConnection connection, SearchRequest request)
+    {
+        try
+        {
+            return (SearchResponse)connection.SendRequest(request);
+        }
+        catch (DirectoryOperationException ex) when (ex.Response is SearchResponse { ResultCode: ResultCode.SizeLimitExceeded } partial)
+        {
+            return partial;
+        }
+    }
 
     private async Task<T> RunAsync<T>(Func<LdapConnection, string, T> action, CancellationToken ct)
     {
