@@ -35,6 +35,10 @@ public sealed class NetworkApplyWatchdog
             await Task.Delay(TimeSpan.FromSeconds(delay));
             if (_probe.IsListening(applied))
                 return;
+            // За время ожидания настройки могли снова изменить (CLI, второй запрос) —
+            // откатывать можно только то, что применяли сами.
+            if (!_network.Current.IsEquivalentTo(applied))
+                return;
 
             _logger.LogError("Панель не слушает {Url} после применения настроек — откат к {Previous}.",
                 NetworkEndpoints.ListenUrl(applied), NetworkEndpoints.ListenUrl(previous));
@@ -49,15 +53,22 @@ public sealed class NetworkApplyWatchdog
                 details += $"; ошибка отката: {ex.Message}";
             }
 
-            using var scope = _scopes.CreateScope();
-            await scope.ServiceProvider.GetRequiredService<IAuditService>().WriteAsync(new AuditEntryDto
+            try
             {
-                Actor = actor,
-                Action = "settings.network.rollback",
-                Target = "network",
-                Success = false,
-                Details = details,
-                SourceIp = sourceIp,
-            });
+                using var scope = _scopes.CreateScope();
+                await scope.ServiceProvider.GetRequiredService<IAuditService>().WriteAsync(new AuditEntryDto
+                {
+                    Actor = actor,
+                    Action = "settings.network.rollback",
+                    Target = "network",
+                    Success = false,
+                    Details = details,
+                    SourceIp = sourceIp,
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Не удалось записать откат сетевых настроек в аудит.");
+            }
         });
 }
