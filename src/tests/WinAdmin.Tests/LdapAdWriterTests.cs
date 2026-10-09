@@ -31,6 +31,18 @@ public sealed class AdWriteRequestsTests
     }
 
     [Fact]
+    public void Clearing_an_attribute_is_a_replace_without_values_so_other_changes_still_apply()
+    {
+        // Delete отсутствующего атрибута проваливает весь (атомарный) ModifyRequest — очищать нужно Replace без значений.
+        var request = AdWriteRequests.BuildModify("CN=u,DC=x", new Dictionary<string, string?> { ["telephoneNumber"] = "", ["title"] = "Инженер" });
+        var mods = request.Modifications.Cast<DirectoryAttributeModification>().ToDictionary(m => m.Name);
+        Assert.Equal(DirectoryAttributeOperation.Replace, mods["telephoneNumber"].Operation);
+        Assert.Equal(0, mods["telephoneNumber"].Count);
+        Assert.Equal(DirectoryAttributeOperation.Replace, mods["title"].Operation);
+        Assert.Equal("Инженер", mods["title"][0]);
+    }
+
+    [Fact]
     public void Global_security_group_type()
         => Assert.Equal(unchecked((int)0x80000002).ToString(), AdWriteRequests.GlobalSecurityGroupType);
 

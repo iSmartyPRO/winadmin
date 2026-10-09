@@ -11,12 +11,7 @@ public sealed class LdapAdWriter(IDirectorySettingsStore directory, IAdStructure
     public Task ModifyAttributesAsync(string dn, IReadOnlyDictionary<string, string?> changes, CancellationToken ct = default)
         => RunAsync("изменение атрибутов", dn, c =>
         {
-            var request = new ModifyRequest(dn);
-            foreach (var (name, value) in changes)
-                request.Modifications.Add(string.IsNullOrEmpty(value)
-                    ? new DirectoryAttributeModification { Name = name, Operation = DirectoryAttributeOperation.Delete }
-                    : Replace(name, value));
-            Send(c, request, tolerate: [ResultCode.NoSuchAttribute]);
+            Send(c, AdWriteRequests.BuildModify(dn, changes));
             return true;
         }, ct);
 
@@ -89,13 +84,10 @@ public sealed class LdapAdWriter(IDirectorySettingsStore directory, IAdStructure
     public Task SetPhotoAsync(string userDn, byte[]? photo, CancellationToken ct = default)
         => RunAsync(photo is null ? "удаление фото" : "загрузку фото", userDn, c =>
         {
-            var mod = new DirectoryAttributeModification
-            {
-                Name = "thumbnailPhoto",
-                Operation = photo is null ? DirectoryAttributeOperation.Delete : DirectoryAttributeOperation.Replace,
-            };
+            // Replace без значений удаляет фото и не ошибается, если его не было.
+            var mod = new DirectoryAttributeModification { Name = "thumbnailPhoto", Operation = DirectoryAttributeOperation.Replace };
             if (photo is not null) mod.Add(photo);
-            Send(c, new ModifyRequest(userDn, mod), tolerate: photo is null ? [ResultCode.NoSuchAttribute] : []);
+            Send(c, new ModifyRequest(userDn, mod));
             return true;
         }, ct);
 

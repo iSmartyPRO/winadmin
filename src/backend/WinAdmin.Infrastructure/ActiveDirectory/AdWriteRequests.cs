@@ -16,6 +16,22 @@ public static class AdWriteRequests
 
     public static int ToggleDisabled(int uac, bool enabled) => enabled ? uac & ~AccountDisable : uac | AccountDisable;
 
+    /// <summary>
+    /// Изменение атрибутов одним (атомарным) запросом. Пустое значение — Replace без значений: удаляет атрибут,
+    /// а если его нет — не ошибка (Delete отсутствующего атрибута провалил бы весь запрос).
+    /// </summary>
+    public static ModifyRequest BuildModify(string dn, IReadOnlyDictionary<string, string?> changes)
+    {
+        var request = new ModifyRequest(dn);
+        foreach (var (name, value) in changes)
+        {
+            var mod = new DirectoryAttributeModification { Name = name, Operation = DirectoryAttributeOperation.Replace };
+            if (!string.IsNullOrEmpty(value)) mod.Add(value);
+            request.Modifications.Add(mod);
+        }
+        return request;
+    }
+
     public static string Rid(string sid) => sid[(sid.LastIndexOf('-') + 1)..];
 
     public static string Parent(string dn) => string.Join(",", DnUtils.Split(dn).Skip(1));
