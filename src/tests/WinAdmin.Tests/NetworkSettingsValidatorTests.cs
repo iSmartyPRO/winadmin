@@ -21,8 +21,6 @@ public sealed class NetworkSettingsValidatorTests
     [Theory]
     [InlineData("10.77.77.0/24")]
     [InlineData("192.168.88.5")]
-    [InlineData("fe80::1")]
-    [InlineData("2001:db8::/32")]
     public void Accepts_addresses_and_cidr(string item)
     {
         var (_, errors) = NetworkSettingsValidator.Normalize(S(NetworkMode.Network, 8080, item));
@@ -37,6 +35,13 @@ public sealed class NetworkSettingsValidatorTests
     [InlineData("0.0.0.0/0")]       // «любой адрес» запрещён
     [InlineData("::/0")]
     [InlineData("2001:db8::/129")]
+    [InlineData("010.0.0.1")]       // восьмеричная запись → 8.0.0.1, неочевидно
+    [InlineData("0x0a.0.0.1")]
+    [InlineData("10.0.0.01")]
+    [InlineData("fe80::1%12")]      // scope id — netsh не примет
+    [InlineData("[::1]:80")]
+    [InlineData("fe80::1")]         // IPv6: режим «Сеть» слушает только IPv4 (0.0.0.0)
+    [InlineData("2001:db8::/32")]
     public void Rejects_garbage_and_any(string item)
     {
         var (_, errors) = NetworkSettingsValidator.Normalize(S(NetworkMode.Network, 8080, item));
@@ -73,6 +78,13 @@ public sealed class NetworkSettingsValidatorTests
         var (settings, errors) = NetworkSettingsValidator.Normalize(new NetworkSettings(NetworkMode.Local, 8080, null!));
         Assert.Empty(errors);
         Assert.Empty(settings.Allow);
+    }
+
+    [Fact]
+    public void Rejects_undefined_mode()
+    {
+        var (_, errors) = NetworkSettingsValidator.Normalize(S((NetworkMode)2, 8080, "10.0.0.0/8"));
+        Assert.NotEmpty(errors);
     }
 
     [Fact]

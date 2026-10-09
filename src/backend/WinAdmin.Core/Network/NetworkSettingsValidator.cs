@@ -11,6 +11,8 @@ public static class NetworkSettingsValidator
     public static (NetworkSettings Settings, IReadOnlyList<string> Errors) Normalize(NetworkSettings input)
     {
         var errors = new List<string>();
+        if (!Enum.IsDefined(input.Mode))
+            errors.Add("Неизвестный режим доступа.");
         if (input.Port is < 1 or > 65535)
             errors.Add("Порт должен быть от 1 до 65535.");
 
@@ -22,7 +24,7 @@ public static class NetworkSettingsValidator
             if (item.Length == 0) continue;
             if (!IsAddressOrCidr(item))
             {
-                errors.Add($"«{item}» — не IP-адрес и не подсеть CIDR (например 10.0.0.0/24).");
+                errors.Add($"«{item}» — не IPv4-адрес и не подсеть CIDR (например 10.0.0.0/24).");
                 badItems = true;
                 continue;
             }
@@ -40,16 +42,17 @@ public static class NetworkSettingsValidator
     {
         int slash = value.IndexOf('/');
         string addressPart = slash < 0 ? value : value[..slash];
-        if (!IPAddress.TryParse(addressPart, out var ip))
+        // Только IPv4: режим «Сеть» слушает 0.0.0.0, правило для IPv6 ничего бы не защищало.
+        if (!IPAddress.TryParse(addressPart, out var ip) || ip.AddressFamily != AddressFamily.InterNetwork)
             return false;
-        // TryParse принимает «10» как 0.0.0.10 — требуем полную запись IPv4.
-        if (ip.AddressFamily == AddressFamily.InterNetwork && addressPart.Count(c => c == '.') != 3)
+        // Только каноническая запись: TryParse принимает «10» (0.0.0.10), восьмеричные и
+        // шестнадцатеричные октеты — такие строки неочевидны и не всегда понятны netsh.
+        if (ip.ToString() != addressPart)
             return false;
         if (slash < 0)
             return true;
 
-        int max = ip.AddressFamily == AddressFamily.InterNetworkV6 ? 128 : 32;
         return int.TryParse(value[(slash + 1)..], NumberStyles.None, CultureInfo.InvariantCulture, out int prefix)
-            && prefix >= 1 && prefix <= max; // /0 — «любой адрес», запрещено
+            && prefix >= 1 && prefix <= 32; // /0 — «любой адрес», запрещено
     }
 }
