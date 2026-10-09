@@ -1967,6 +1967,9 @@ public sealed class LoginThrottleApiTests(NetworkApiFactory factory)
     {
         var client = factory.ClientFrom("10.9.9." + Random.Shared.Next(1, 250));
         string login = "brute" + Guid.NewGuid().ToString("N")[..6];
+        // Локальная учётка: неверный пароль — неудачная попытка с любого адреса (пароль домена с сети дал бы 400).
+        using (var scope = factory.Services.CreateScope())
+            await scope.ServiceProvider.GetRequiredService<IUserService>().CreateAsync(new CreateUserRequest { Login = login, Password = "Right-123456" });
         for (int i = 0; i < 5; i++)
             Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("/api/v1/auth/login", new { login, password = "x" })).StatusCode);
         var r = await client.PostAsJsonAsync("/api/v1/auth/login", new { login, password = "x" });

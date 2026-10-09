@@ -161,6 +161,7 @@ authzBuilder.SetDefaultPolicy(new AuthorizationPolicyBuilder("Auto")
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
 builder.Services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
 builder.Services.AddSingleton<AccessContextFactory>();
+builder.Services.AddSingleton<LoginThrottle>();
 
 builder.Services.AddRateLimiter(options =>
 {

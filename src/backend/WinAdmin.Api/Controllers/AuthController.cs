@@ -11,7 +11,7 @@ namespace WinAdmin.Api.Controllers;
 [Produces("application/json")]
 public sealed class AuthController(
     IUserService users, ITokenService tokens, IDirectorySignIn directory,
-    IDirectorySettingsStore directorySettings, IAuditService audit) : ControllerBase
+    IDirectorySettingsStore directorySettings, IAuditService audit, LoginThrottle throttle) : ControllerBase
 {
     private const string RefreshCookie = "wa_refresh";
 
@@ -32,12 +32,19 @@ public sealed class AuthController(
         if (login.Length == 0 || string.IsNullOrEmpty(request.Password))
             return Unauthorized(new { message = "Неверный логин или пароль" });
 
+        if (throttle.RetryAfter(ClientIp, login) is { } wait)
+        {
+            Response.Headers.RetryAfter = ((int)Math.Ceiling(wait.TotalSeconds)).ToString();
+            return StatusCode(StatusCodes.Status429TooManyRequests, new { message = "Слишком много попыток входа, попробуйте позже" });
+        }
+
         // 1. Есть локальный пользователь с таким логином — только его пароль, в домен не идём.
         if (await users.ExistsAsync(login, ct))
         {
             var local = await users.ValidateAsync(login, request.Password, ct);
             if (local is null) return await FailedAsync(login, "local", ct);
             await AuditAsync("auth.login", login, true, "local", ct);
+            throttle.Succeeded(ClientIp, login);
             return await IssueLocalAsync(local, ct);
         }
 
@@ -106,6 +113,7 @@ public sealed class AuthController(
         {
             case DirectorySignInStatus.Ok:
                 await AuditAsync(action, result.Account!.LoginName, true, "ad", ct);
+                throttle.Succeeded(ClientIp, login);
                 SetRefreshCookie(await tokens.CreateDirectoryRefreshTokenAsync(result.Account.Sid, ct));
                 return Ok(new TokenResponse { AccessToken = tokens.GenerateDirectoryAccessToken(result.Account), ExpiresIn = 3600 });
             case DirectorySignInStatus.NoAccess:
@@ -122,8 +130,11 @@ public sealed class AuthController(
     private async Task<IActionResult> FailedAsync(string login, string source, CancellationToken ct, string action = "auth.login.failed")
     {
         await AuditAsync(action, login, false, source, ct);
+        throttle.Failed(ClientIp, login);
         return Unauthorized(new { message = "Неверный логин или пароль" });
     }
+
+    private string ClientIp => HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 
     private Task AuditAsync(string action, string actor, bool success, string details, CancellationToken ct)
         => audit.WriteAsync(new AuditEntryDto

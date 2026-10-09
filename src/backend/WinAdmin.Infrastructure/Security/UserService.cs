@@ -11,6 +11,10 @@ public sealed class UserService : IUserService
     private readonly WinAdminDbContext _db;
     private readonly PasswordHasher<UserEntity> _hasher = new();
 
+    // Хеш для несуществующего логина: время ответа не выдаёт, есть ли такой пользователь.
+    private static readonly Lazy<string> DummyHash = new(() =>
+        new PasswordHasher<UserEntity>().HashPassword(new UserEntity(), Guid.NewGuid().ToString()));
+
     public UserService(WinAdminDbContext db) => _db = db;
 
     public async Task<IReadOnlyList<UserDto>> ListAsync(CancellationToken ct = default)
@@ -58,7 +62,12 @@ public sealed class UserService : IUserService
     public async Task<UserPrincipal?> ValidateAsync(string login, string password, CancellationToken ct = default)
     {
         var entity = await _db.Users.FirstOrDefaultAsync(u => u.Login == login, ct);
-        if (entity is null || !entity.IsActive) return null;
+        if (entity is null)
+        {
+            _hasher.VerifyHashedPassword(new UserEntity(), DummyHash.Value, password);
+            return null;
+        }
+        if (!entity.IsActive) return null;
         var result = _hasher.VerifyHashedPassword(entity, entity.PasswordHash, password);
         if (result == PasswordVerificationResult.Failed) return null;
         return ToPrincipal(entity);
