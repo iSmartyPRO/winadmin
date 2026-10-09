@@ -1,3 +1,4 @@
+using WinAdmin.Core.ActiveDirectory.Users;
 using WinAdmin.Core.ActiveDirectory;
 using WinAdmin.Core.EnvironmentChecks;
 
@@ -48,4 +49,19 @@ public interface IEnvironmentService
 {
     Task<IReadOnlyList<EnvironmentReport>> RunAsync(string? moduleId, CheckDepth depth, CancellationToken ct = default);
     IReadOnlyList<EnvironmentReport> Latest { get; }
+}
+
+/// <summary>Чтение пользователей и групп для модуля «Пользователи AD» (учётка компьютера).</summary>
+public interface IAdUserDirectory
+{
+    Task<IReadOnlyList<AdUser>> ListUsersAsync(string baseDn, IReadOnlyCollection<string> attributes, CancellationToken ct = default);
+    Task<AdUser?> FindUserAsync(string sam, IReadOnlyCollection<string> attributes, CancellationToken ct = default);
+    Task<IReadOnlyList<AdGroupRef>> GetGroupsAsync(AdUser user, CancellationToken ct = default);
+    Task<byte[]?> GetPhotoAsync(string dn, CancellationToken ct = default);
+    Task<AdGroupRef?> FindGroupAsync(string nameOrDn, CancellationToken ct = default);
+    Task<AdGroupRef> GetDomainUsersGroupAsync(CancellationToken ct = default);
+    Task<string?> FindSampleUserAsync(string ouDn, CancellationToken ct = default);
+    /// <summary>SID учётки записи, её групп (tokenGroups) и Everyone / Authenticated Users — для разбора ACL.</summary>
+    Task<IReadOnlyList<string>> GetWriterSidsAsync(CancellationToken ct = default);
+    Task<byte[]?> ReadSecurityDescriptorAsync(string dn, CancellationToken ct = default);
 }

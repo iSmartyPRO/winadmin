@@ -1,3 +1,4 @@
+using WinAdmin.Infrastructure.ActiveDirectory.Users;
 using WinAdmin.Core.EnvironmentChecks;
 using WinAdmin.Infrastructure.EnvironmentChecks;
 using WinAdmin.Infrastructure.ActiveDirectory;
@@ -59,6 +60,8 @@ public static class DependencyInjection
         services.AddSingleton<IDirectorySettingsStore, DirectorySettingsStore>();
         services.AddSingleton<IAdStructureStore, AdStructureStore>();
         services.AddSingleton<IAdWriter, LdapAdWriter>();
+        services.AddSingleton<IAdUserDirectory>(sp => new LdapAdUserDirectory(
+            sp.GetRequiredService<IDirectorySettingsStore>(), sp.GetRequiredService<IAdStructureStore>()));
         services.AddSingleton<IEnvironmentService, EnvironmentService>();
         services.AddSingleton<IEnvironmentCheck, PlatformAdCheck>();
         services.AddSingleton<IAdReader>(sp => new LdapAdReader(
