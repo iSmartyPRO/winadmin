@@ -12,12 +12,36 @@ public static class InstallationHardening
 {
     public static void Apply(string appDirectory, string dataDirectory, ILogger logger)
     {
-        HardenDirectory(appDirectory, AclPlan.ForAppDirectory(), logger);
+        if (AclPlan.IsSafeTarget(appDirectory, ["WinAdmin.exe"]))
+            HardenDirectory(appDirectory, AclPlan.ForAppDirectory(), logger);
+        else
+            logger.LogWarning("Права на {Dir} не изменены: похоже на общую папку, а не на папку WinAdmin.", appDirectory);
+
         if (AclPlan.SameDirectory(appDirectory, dataDirectory))
             logger.LogWarning("БД лежит в папке приложения ({Dir}) и доступна пользователям на чтение. " +
                               "Вынесите её в C:\\ProgramData\\WinAdmin (WinAdmin__DatabasePath).", dataDirectory);
-        else
+        else if (AclPlan.IsSafeTarget(dataDirectory, ["WinAdmin.db", WinAdminPaths.NetworkFileName]))
             HardenDirectory(dataDirectory, AclPlan.ForDataDirectory(), logger);
+        else
+            logger.LogWarning("Права на {Dir} не изменены: похоже на общую папку, а не на папку данных WinAdmin. " +
+                              "Укажите отдельную папку в WinAdmin__DatabasePath.", dataDirectory);
+    }
+
+    /// <summary>Ставит на файл защищённый DACL из rules (например, bootstrap-key.txt — admin-ключ).</summary>
+    public static void ProtectFile(string path, IReadOnlyList<AclRule> rules, ILogger logger)
+    {
+        try
+        {
+            var security = new FileSecurity();
+            security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+            foreach (var rule in rules)
+                security.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier(rule.Sid), rule.Rights, AccessControlType.Allow));
+            new FileInfo(path).SetAccessControl(security);
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or PrivilegeNotHeldException)
+        {
+            logger.LogWarning(ex, "Не удалось ограничить права на {File}.", path);
+        }
     }
 
     /// <summary>
@@ -47,7 +71,26 @@ public static class InstallationHardening
             return;
         }
 
-        foreach (var item in root.EnumerateFileSystemInfos("*", SearchOption.AllDirectories))
+        // Не заходим в недоступные каталоги и не следуем по junction/symlink — иначе SYSTEM
+        // сбросил бы права на чужие папки, а исключение в обходе уронило бы старт службы.
+        var options = new EnumerationOptions
+        {
+            RecurseSubdirectories = true,
+            IgnoreInaccessible = true,
+            AttributesToSkip = FileAttributes.ReparsePoint,
+        };
+        IEnumerable<FileSystemInfo> items;
+        try
+        {
+            items = root.EnumerateFileSystemInfos("*", options).ToList();
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+        {
+            logger.LogWarning(ex, "Не удалось обойти {Dir} для сброса прав.", directory);
+            return;
+        }
+
+        foreach (var item in items)
         {
             try
             {

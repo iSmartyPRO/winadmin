@@ -201,6 +201,12 @@ using (var scope = app.Services.CreateScope())
     {
         string file = Path.Combine(AppContext.BaseDirectory, "bootstrap-key.txt");
         await File.WriteAllTextAsync(file, raw);
+        // Папка приложения читается всеми пользователями — admin-ключ закрываем отдельно.
+        InstallationHardening.ProtectFile(file,
+            [.. AclPlan.ForDataDirectory(),
+             new AclRule(System.Security.Principal.WindowsIdentity.GetCurrent().User!.Value,
+                 System.Security.AccessControl.FileSystemRights.FullControl)],
+            app.Logger);
         app.Logger.LogWarning("Создан стартовый admin API-ключ: {Key}", raw);
         app.Logger.LogWarning("Сохранён в {File}. Удалите файл после копирования.", file);
     }
@@ -222,7 +228,14 @@ if (networkSource.Provider?.LastError is { } networkError)
 
 if (WindowsServiceHelpers.IsWindowsService())
 {
-    InstallationHardening.Apply(AppContext.BaseDirectory, dataDirectory, app.Logger);
+    try
+    {
+        InstallationHardening.Apply(AppContext.BaseDirectory, dataDirectory, app.Logger);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogWarning(ex, "Не удалось исправить права на папки WinAdmin.");
+    }
     try
     {
         var network = app.Services.GetRequiredService<INetworkSettingsService>();

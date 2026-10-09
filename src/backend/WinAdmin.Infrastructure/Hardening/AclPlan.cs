@@ -27,6 +27,36 @@ public static class AclPlan
         new(LocalSystem, FileSystemRights.FullControl),
     ];
 
+    /// <summary>
+    /// Можно ли менять права на папку: не корень диска, не общая системная папка и в ней
+    /// есть хотя бы один из файлов WinAdmin (защита от неверного пути — служба работает как SYSTEM).
+    /// </summary>
+    public static bool IsSafeTarget(string directory, IReadOnlyList<string> markerFiles)
+    {
+        string full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory));
+        string? root = Path.GetPathRoot(full);
+        if (root is null || SameDirectory(full, root))
+            return false;
+
+        Environment.SpecialFolder[] shared =
+        [
+            Environment.SpecialFolder.CommonApplicationData, Environment.SpecialFolder.ProgramFiles,
+            Environment.SpecialFolder.ProgramFilesX86, Environment.SpecialFolder.Windows,
+            Environment.SpecialFolder.System, Environment.SpecialFolder.UserProfile,
+        ];
+        foreach (var folder in shared)
+        {
+            string path = Environment.GetFolderPath(folder);
+            if (path.Length > 0 && SameDirectory(full, path))
+                return false;
+        }
+        string users = Path.Combine(root, "Users");
+        if (SameDirectory(full, users) || SameDirectory(Path.GetDirectoryName(full) ?? "", users))
+            return false;
+
+        return markerFiles.Any(m => File.Exists(Path.Combine(full, m)));
+    }
+
     public static bool SameDirectory(string a, string b)
         => string.Equals(
             Path.TrimEndingDirectorySeparator(Path.GetFullPath(a)),
