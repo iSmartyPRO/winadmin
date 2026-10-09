@@ -49,3 +49,9 @@ public interface IWinAdminModule
     IScopeProvider? Scope { get; }
     void ConfigureServices(IServiceCollection services, IConfiguration configuration);
 }
+
+/// <summary>Модуль, которому нужно действие при первом включении (например, шаблоны ролей).</summary>
+public interface IModuleLifecycle
+{
+    Task OnFirstEnabledAsync(IServiceProvider services, CancellationToken ct);
+}

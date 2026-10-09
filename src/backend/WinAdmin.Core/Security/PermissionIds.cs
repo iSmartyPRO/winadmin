@@ -18,6 +18,12 @@ public static class PermissionIds
     public const string SoftwareRead = "software.read";
     public const string SoftwareManage = "software.manage";
 
+    public const string AdUsersRead = "ad-users.read";
+    public const string AdUsersEdit = "ad-users.edit";
+    public const string AdUsersMove = "ad-users.move";
+    public const string AdUsersPassword = "ad-users.password";
+    public const string AdUsersOffboard = "ad-users.offboard";
+
     public const string PlatformUsersManage = "platform.users.manage";
     public const string PlatformRolesManage = "platform.roles.manage";
     public const string PlatformModulesManage = "platform.modules.manage";

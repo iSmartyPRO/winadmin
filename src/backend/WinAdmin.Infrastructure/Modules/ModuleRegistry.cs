@@ -36,8 +36,15 @@ public sealed class ModuleRegistry(
         if (enabled && !available)
             throw new InvalidOperationException($"Модуль «{module.Title}» недоступен на этой машине: {reason}");
 
+        bool firstEnable = enabled && !Rows().ContainsKey(id);
         await UpsertAsync(id, row => row.Enabled = enabled, actor, ct);
         await AuditAsync(actor, enabled ? "module.enable" : "module.disable", id, null, ct);
+
+        if (firstEnable && module is IModuleLifecycle lifecycle)
+        {
+            using var scope = scopes.CreateScope();
+            await lifecycle.OnFirstEnabledAsync(scope.ServiceProvider, ct);
+        }
     }
 
     public IReadOnlyList<SettingsField> GetSettingsSchema(string id)

@@ -42,5 +42,6 @@ public static class BuiltInModules
         new BuiltInModule("software", "Программы", "Установленные программы и обновления",
             new PermissionDefinition(PermissionIds.SoftwareRead, "Просмотр программ и обновлений"),
             new PermissionDefinition(PermissionIds.SoftwareManage, "Удаление программ и откат обновлений", Dangerous: true)),
+        new ActiveDirectory.Users.AdUsersModule(),
     ];
 }

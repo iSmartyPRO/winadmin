@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Права: `ad.users.read`, `ad.users.edit`, `ad.users.move`, `ad.users.password` (опасное), `ad.users.offboard` (опасное); все — с областью «Проекты (OU)».
+- Права: `ad-users.read`, `ad-users.edit`, `ad-users.move`, `ad-users.password` (опасное), `ad-users.offboard` (опасное); все — с областью «Проекты (OU)».
 - Перед любой записью — `AdGuard.EnsureManaged` + `AdGuard.EnsureInScope` (3a); 403 до обращения к writer.
 - Атрибуты — только из `EditableAttributes` (по умолчанию 10 из Access); длина ≤ 256, `description` ≤ 1024; `mail` — адрес.
 - Фото — JPEG/PNG (по сигнатуре) ≤ `PhotoMaxKb` (100).
@@ -59,8 +59,8 @@
 ## Решения плана
 
 - **Доступность модуля без `RootOu`.** Спец. §1.1 говорит «модуль недоступен, пока не задана корневая OU»; у контракта модулей нет хука доступности по настройкам. Модуль доступен по требованию `DomainJoined`, а операции без корневой OU отвечают 409 «Корневая OU не задана», проверка окружения показывает это первой строкой. Цена ошибки: модуль можно включить заранее — он просто ничего не покажет.
-- **Шаблоны ролей:** «AD: отдел кадров» (`read`, `edit`, `move`) и «AD: администраторы пользователей» (все `ad.users.*`). Права папок появятся отдельным шаблоном в 3c (существующую роль 3c не меняет).
-- **Уволенные пользователи** (в `TerminatedOuDn`, обычно вне корневой OU) не принадлежат проекту: видеть их и действовать над ними может любой с `ad.users.offboard` (любая область); при восстановлении целевой проект обязан быть в области.
+- **Шаблоны ролей:** «AD: отдел кадров» (`read`, `edit`, `move`) и «AD: администраторы пользователей» (все `ad-users.*`). Права папок появятся отдельным шаблоном в 3c (существующую роль 3c не меняет).
+- **Уволенные пользователи** (в `TerminatedOuDn`, обычно вне корневой OU) не принадлежат проекту: видеть их и действовать над ними может любой с `ad-users.offboard` (любая область); при восстановлении целевой проект обязан быть в области.
 - **История в карточке** — аудит по `Target` = текущий DN (после переноса старые записи с прежним DN в карточке не видны — журнал аудита их содержит).
 - **Фото** — без библиотеки обрезки: браузер вписывает изображение в 256×256 и кодирует JPEG (canvas), сервер проверяет сигнатуру и размер.
 
@@ -80,7 +80,7 @@
 - Consumes: `ProjectScopeProvider` (3a), `IRoleService.ListAsync/CreateAsync`, `PermissionCatalog`, `PermissionEvaluator`, `BuiltInRoles` (1b)
 - Produces:
   - `interface IModuleLifecycle { Task OnFirstEnabledAsync(IServiceProvider services, CancellationToken ct); }`
-  - `PermissionIds.AdUsersRead|AdUsersEdit|AdUsersMove|AdUsersPassword|AdUsersOffboard` (`"ad.users.read"` …)
+  - `PermissionIds.AdUsersRead|AdUsersEdit|AdUsersMove|AdUsersPassword|AdUsersOffboard` (`"ad-users.read"` …)
   - `class AdUsersSettings { string FiredGroup; string TerminatedOuDn; List<string> EditableAttributes; int PhotoMaxKb; static IReadOnlyList<string> DefaultAttributes }`
   - `class AdUsersModule : IWinAdminModule, IModuleLifecycle` (`ModuleId = "ad-users"`, `HrRoleName`, `AdminRoleName`)
 
@@ -95,6 +95,7 @@ using Moq;
 using WinAdmin.Core.Abstractions;
 using WinAdmin.Core.ActiveDirectory;
 using WinAdmin.Core.ActiveDirectory.Users;
+using WinAdmin.Core.Models;
 using WinAdmin.Core.Modules;
 using WinAdmin.Core.Security;
 using WinAdmin.Infrastructure.Access;
@@ -204,11 +205,11 @@ public interface IModuleLifecycle
 `PermissionIds.cs`:
 
 ```csharp
-    public const string AdUsersRead = "ad.users.read";
-    public const string AdUsersEdit = "ad.users.edit";
-    public const string AdUsersMove = "ad.users.move";
-    public const string AdUsersPassword = "ad.users.password";
-    public const string AdUsersOffboard = "ad.users.offboard";
+    public const string AdUsersRead = "ad-users.read";
+    public const string AdUsersEdit = "ad-users.edit";
+    public const string AdUsersMove = "ad-users.move";
+    public const string AdUsersPassword = "ad-users.password";
+    public const string AdUsersOffboard = "ad-users.offboard";
 ```
 
 ```csharp
@@ -1116,7 +1117,7 @@ namespace WinAdmin.Infrastructure.ActiveDirectory.Users;
 
 /// <summary>
 /// Пользователи AD. Управляемый пользователь — в проекте под корневой OU (не скрытом) и в области оператора;
-/// уволенный — в OU уволенных: виден и доступен тем, у кого есть ad.users.offboard.
+/// уволенный — в OU уволенных: виден и доступен тем, у кого есть ad-users.offboard.
 /// </summary>
 public sealed partial class AdUsersService(
     IAdUserDirectory directory, IAdWriter writer, IAdReader reader, IAdStructureStore structure,
@@ -1845,7 +1846,7 @@ public sealed partial class AdUsersService
 ```
 
 `Failed_activation_returns_no_password`: перенос падает до шага пароля → `password` остаётся `null`, а `run.Failed` → `null`.
-`Repeat_deactivation_of_terminated_user_is_idempotent`: уволенный — `LocateAsync` разрешает любому с `ad.users.offboard`; шаги: «уже в группе», «уже основная», нет групп для удаления, пароль, «уже отключена», «уже в OU уволенных».
+`Repeat_deactivation_of_terminated_user_is_idempotent`: уволенный — `LocateAsync` разрешает любому с `ad-users.offboard`; шаги: «уже в группе», «уже основная», нет групп для удаления, пароль, «уже отключена», «уже в OU уволенных».
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -2253,7 +2254,7 @@ git commit -m "feat(ad-users): environment checks incl. attribute rights and res
 **Interfaces:**
 - Consumes: `IAdUsersService` (Task 3–5), `IAdReader`, `IModuleRegistry`, `AccessContextFactory`, `WinAdminModuleAttribute`, `PlatformErrorsAttribute`
 - Produces:
-  - `GET /api/v1/ad/projects` → `[{ dn, name }]` (из области `ad.users.read`; 404, если модуль `ad-users` выключен)
+  - `GET /api/v1/ad/projects` → `[{ dn, name }]` (из области `ad-users.read`; 404, если модуль `ad-users` выключен)
   - `GET /api/v1/ad/users?project=&status=active|disabled|terminated|all&q=` → `AdUserView[]`
   - `GET /api/v1/ad/users/{sam}` → `AdUserCard`; `GET …/{sam}/photo` → `image/jpeg|png` или 404; `GET …/{sam}/history` → `AuditEntryDto[]`
   - `PUT …/{sam}/attributes` `{ attributes: { name: value } }` → `AdUserView`
@@ -2524,7 +2525,7 @@ using WinAdmin.Core.Security;
 
 namespace WinAdmin.Api.Controllers;
 
-/// <summary>Проекты (OU первого уровня) в пределах области; общий для модулей AD (3c добавит ad.folders.read).</summary>
+/// <summary>Проекты (OU первого уровня) в пределах области; общий для модулей AD (3c добавит ad-folders.read).</summary>
 [PlatformErrors]
 [AdErrors]
 [Route("/api/v1/ad/projects")]
@@ -2581,7 +2582,7 @@ git commit -m "feat(api): AD users and projects endpoints with module/scope chec
 
 **Interfaces:**
 - Consumes: API Task 7
-- Produces: маршрут `/ad/users` (модуль `ad-users`, право `ad.users.read`); `api.ad.*`
+- Produces: маршрут `/ad/users` (модуль `ad-users`, право `ad-users.read`); `api.ad.*`
 
 Frontend-тестов нет — `npm run build`, `npm run lint`, браузер.
 
@@ -2734,14 +2735,14 @@ function UserCard({ sam, projects, onClose, onChanged }: {
           <Tabs items={[
             {
               key: 'attrs', label: 'Атрибуты', children: (
-                <Form form={form} layout="vertical" disabled={!can('ad.users.edit') || u.terminated}
+                <Form form={form} layout="vertical" disabled={!can('ad-users.edit') || u.terminated}
                   onFinish={(values) => run('attrs', async () => { await api.ad.updateAttributes(u.sam, values); message.success('Сохранено') })}>
                   <Row gutter={12}>
                     {ATTRS.map(([k, label]) => (
                       <Col span={k === 'description' ? 24 : 12} key={k}><Form.Item name={k} label={label}><Input /></Form.Item></Col>
                     ))}
                   </Row>
-                  {can('ad.users.edit') && !u.terminated && (
+                  {can('ad-users.edit') && !u.terminated && (
                     <Space wrap>
                       <Button type="primary" htmlType="submit" loading={busy === 'attrs'}>Сохранить</Button>
                       <Upload accept="image/*" showUploadList={false} beforeUpload={(file) => {
@@ -2761,14 +2762,14 @@ function UserCard({ sam, projects, onClose, onChanged }: {
             ) },
             { key: 'actions', label: 'Действия', children: (
               <Space direction="vertical" style={{ width: '100%' }}>
-                {can('ad.users.move') && !u.terminated && (
+                {can('ad-users.move') && !u.terminated && (
                   <Space.Compact style={{ width: '100%' }}>
                     <Select style={{ flex: 1 }} placeholder="Перенести в проект" value={target} onChange={setTarget}
                       options={projects.filter((p) => p.dn !== u.projectDn).map((p) => ({ value: p.dn, label: p.name }))} />
                     <Button disabled={!target} loading={busy === 'move'} onClick={() => run('move', async () => { await api.ad.move(u.sam, target!); message.success('Перенесён') })}>Перенести</Button>
                   </Space.Compact>
                 )}
-                {can('ad.users.password') && !u.terminated && (
+                {can('ad-users.password') && !u.terminated && (
                   <Space wrap>
                     <Popconfirm title="Сгенерировать новый пароль? Пользователь сменит его при входе."
                       onConfirm={() => run('pwd', async () => { const r = await api.ad.password(u.sam, { generate: true, mustChange: true }); if (r.password) showPassword(r.password) })}>
@@ -2777,13 +2778,13 @@ function UserCard({ sam, projects, onClose, onChanged }: {
                     <ManualPassword onSubmit={(password, mustChange) => run('pwd', async () => { await api.ad.password(u.sam, { password, generate: false, mustChange }); message.success('Пароль изменён') })} />
                   </Space>
                 )}
-                {can('ad.users.offboard') && !u.terminated && (
+                {can('ad-users.offboard') && !u.terminated && (
                   <Popconfirm title="Уволить пользователя?" description="Снять все группы, отключить, перенести в OU уволенных."
                     okButtonProps={{ danger: true }} onConfirm={() => run('off', async () => setSteps(await api.ad.deactivate(u.sam)))}>
                     <Button danger loading={busy === 'off'}>Уволить</Button>
                   </Popconfirm>
                 )}
-                {can('ad.users.offboard') && (u.terminated || !u.enabled) && (
+                {can('ad-users.offboard') && (u.terminated || !u.enabled) && (
                   <Space.Compact style={{ width: '100%' }}>
                     <Select style={{ flex: 1 }} placeholder="Восстановить в проект" value={target} onChange={setTarget}
                       options={projects.map((p) => ({ value: p.dn, label: p.name }))} />
@@ -2861,7 +2862,7 @@ export default function AdUsers() {
 
   const statuses = [
     { value: 'active', label: 'Активные' }, { value: 'disabled', label: 'Отключённые' },
-    ...(can('ad.users.offboard') ? [{ value: 'terminated', label: 'Уволенные' }] : []),
+    ...(can('ad-users.offboard') ? [{ value: 'terminated', label: 'Уволенные' }] : []),
     { value: 'all', label: 'Все' },
   ]
 
@@ -2888,7 +2889,7 @@ export default function AdUsers() {
 
 Если `Modal` в используемой версии AntD не знает `destroyOnHidden` — использовать `destroyOnClose` (сверить с другими страницами проекта).
 
-`App.tsx` — маршрут по образцу существующих модульных: `<Route path="/ad/users" element={<Guard perm="ad.users.read" module="ad-users"><AdUsers /></Guard>} />` (+ `import AdUsers from './pages/AdUsers'`). `AppLayout.tsx` — пункт меню `{ key: '/ad/users', icon: <IdcardOutlined />, label: 'Пользователи AD', perm: 'ad.users.read', module: 'ad-users' }` в основной части меню (после «Журналы Windows»), `IdcardOutlined` — в импорт иконок. Сверить имя свойства `Guard` для модуля (`module`) с `Guard.tsx`.
+`App.tsx` — маршрут по образцу существующих модульных: `<Route path="/ad/users" element={<Guard perm="ad-users.read" module="ad-users"><AdUsers /></Guard>} />` (+ `import AdUsers from './pages/AdUsers'`). `AppLayout.tsx` — пункт меню `{ key: '/ad/users', icon: <IdcardOutlined />, label: 'Пользователи AD', perm: 'ad-users.read', module: 'ad-users' }` в основной части меню (после «Журналы Windows»), `IdcardOutlined` — в импорт иконок. Сверить имя свойства `Guard` для модуля (`module`) с `Guard.tsx`.
 
 - [ ] **Step 3: Проекты в редакторе ролей**
 
@@ -2939,8 +2940,8 @@ git commit -m "feat(ui): AD users page (list, card, attributes, photo, move, pas
 
 - [ ] **Step 1: Документация**
 
-- API: `/ad/projects`, `/ad/users` (все маршруты Task 7, коды 403/404/409/422/503), права `ad.users.*`.
-- Безопасность: область «Проекты (OU)»; уволенные доступны с `ad.users.offboard`; пароли один раз; что делегировать учётке записи (атрибуты, `thumbnailPhoto`, Reset Password, Write members на Fired Users и «Пользователи домена», перенос между OU).
+- API: `/ad/projects`, `/ad/users` (все маршруты Task 7, коды 403/404/409/422/503), права `ad-users.*`.
+- Безопасность: область «Проекты (OU)»; уволенные доступны с `ad-users.offboard`; пароли один раз; что делегировать учётке записи (атрибуты, `thumbnailPhoto`, Reset Password, Write members на Fired Users и «Пользователи домена», перенос между OU).
 - Пакетный README: «Модули → Пользователи AD»: включить, настройки (группа и OU уволенных), шаблоны ролей, «Проверка окружения».
 
 - [ ] **Step 2: Полный прогон и пакет**
