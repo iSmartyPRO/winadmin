@@ -70,6 +70,37 @@ public sealed class MasterKeyStoreTests : IDisposable
     }
 
     [Fact]
+    public void Concurrent_creation_yields_one_key()
+    {
+        // Служба и CLI стартуют одновременно на чистой установке — ключ должен быть один.
+        string keysDir = Path.Combine(_dir, "race");
+        var keys = new byte[8][];
+        using var start = new Barrier(keys.Length);
+        Parallel.For(0, keys.Length, new ParallelOptions { MaxDegreeOfParallelism = keys.Length }, i =>
+        {
+            start.SignalAndWait();
+            keys[i] = new MasterKeyStore(keysDir).LoadOrCreate();
+        });
+
+        byte[] onDisk = new MasterKeyStore(keysDir).Load();
+        Assert.All(keys, k => Assert.Equal(onDisk, k));
+    }
+
+    [Fact]
+    public void Keys_directory_is_protected_and_users_are_not_granted()
+    {
+        var store = new MasterKeyStore(Path.Combine(_dir, "acl"));
+        store.LoadOrCreate();
+
+        var dirAcl = new DirectoryInfo(store.KeysDirectory).GetAccessControl();
+        Assert.True(dirAcl.AreAccessRulesProtected);
+        var sids = dirAcl.GetAccessRules(true, true, typeof(System.Security.Principal.SecurityIdentifier))
+            .Cast<FileSystemAccessRule>().Select(r => r.IdentityReference.Value).ToList();
+        Assert.DoesNotContain("S-1-5-32-545", sids); // Пользователи
+        Assert.DoesNotContain("S-1-5-11", sids);     // Прошедшие проверку
+    }
+
+    [Fact]
     public void Corrupt_key_file_reports_secret_unavailable()
     {
         var store = new MasterKeyStore(Path.Combine(_dir, "bad"));

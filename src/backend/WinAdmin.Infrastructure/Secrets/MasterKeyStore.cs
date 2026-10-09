@@ -34,8 +34,18 @@ public sealed class MasterKeyStore
     {
         if (Exists) return Load();
         byte[] key = RandomNumberGenerator.GetBytes(KeySize);
-        Save(key);
-        return key;
+        // Другой процесс (служба / CLI) мог создать ключ одновременно — побеждает первый, остальные читают его.
+        return Save(key, overwrite: false) ? key : Load();
+    }
+
+    /// <summary>
+    /// Каталог keys — защищённый DACL (Администраторы, SYSTEM, текущий процесс), файлы наследуют только его.
+    /// Вызывается при создании ключа и после исправления прав на папку приложения/данных.
+    /// </summary>
+    public void ProtectKeysDirectory(Microsoft.Extensions.Logging.ILogger? logger = null)
+    {
+        Directory.CreateDirectory(KeysDirectory);
+        InstallationHardening.HardenDirectory(KeysDirectory, KeyFileRules(), logger ?? NullLogger.Instance);
     }
 
     public byte[] Load()
@@ -93,7 +103,7 @@ public sealed class MasterKeyStore
         {
             throw new InvalidOperationException("Неверный пароль или повреждённый файл экспорта ключа.");
         }
-        Save(key);
+        Save(key, overwrite: true);
     }
 
     public static IReadOnlyList<AclRule> KeyFileRules() =>
@@ -102,13 +112,23 @@ public sealed class MasterKeyStore
         new AclRule(WindowsIdentity.GetCurrent().User!.Value, FileSystemRights.FullControl),
     ];
 
-    private void Save(byte[] key)
+    /// <summary>Атомарная запись; без overwrite возвращает false, если ключ уже создан другим процессом.</summary>
+    private bool Save(byte[] key, bool overwrite)
     {
-        Directory.CreateDirectory(KeysDirectory);
-        string tmp = FilePath + ".tmp";
+        ProtectKeysDirectory();
+        string tmp = $"{FilePath}.{Guid.NewGuid():N}.tmp";
         File.WriteAllBytes(tmp, ProtectedData.Protect(key, Entropy, DataProtectionScope.LocalMachine));
         InstallationHardening.ProtectFile(tmp, KeyFileRules(), NullLogger.Instance);
-        File.Move(tmp, FilePath, overwrite: true);
+        try
+        {
+            File.Move(tmp, FilePath, overwrite);
+            return true;
+        }
+        catch (IOException) when (!overwrite && File.Exists(FilePath))
+        {
+            File.Delete(tmp);
+            return false;
+        }
     }
 
     private static byte[] DeriveKey(string password, byte[] salt)

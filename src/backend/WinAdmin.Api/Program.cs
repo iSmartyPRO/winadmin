@@ -252,7 +252,8 @@ if (WindowsServiceHelpers.IsWindowsService())
 {
     try
     {
-        InstallationHardening.Apply(AppContext.BaseDirectory, dataDirectory, app.Logger);
+        StartupHardening.Run(AppContext.BaseDirectory, dataDirectory, new MasterKeyStore(keysDirectory),
+            Path.Combine(AppContext.BaseDirectory, "bootstrap-key.txt"), app.Logger);
     }
     catch (Exception ex)
     {
