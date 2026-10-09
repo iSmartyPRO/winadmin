@@ -242,11 +242,12 @@ using (var scope = app.Services.CreateScope())
     await PlatformBootstrapper.RunAsync(db, scope.ServiceProvider.GetRequiredService<PermissionCatalog>());
 
     var users = scope.ServiceProvider.GetRequiredService<IUserService>();
-    if (!await users.AnyAsync())
+    var advice = StartupAdvice.For(await users.AnyAsync(),
+        await scope.ServiceProvider.GetRequiredService<IRoleService>().CountActiveAdministratorsAsync());
+    if (advice.Count > 0)
     {
         app.Logger.LogWarning("════════════════════════════════════════════════════");
-        app.Logger.LogWarning("Пользователи не созданы. Создайте первого пользователя:");
-        app.Logger.LogWarning("WinAdmin.exe user add --login admin --password <пароль> --scopes admin");
+        foreach (var line in advice) app.Logger.LogWarning("{Advice}", line);
         app.Logger.LogWarning("════════════════════════════════════════════════════");
     }
 }

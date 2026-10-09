@@ -142,6 +142,17 @@ public sealed class RoleServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Ad_assignment_does_not_count_as_active_administrator_yet()
+    {
+        var local = await AssignAdmin("u-admin");
+        await _roles.AssignAsync(new CreateAssignmentRequest(BuiltInRoles.AdministratorId, PrincipalType.AdGroup, "S-1-5-21-1-2-3-512", "Domain Admins"), Admin);
+
+        // Без входа через AD эта группа не может управлять WinAdmin — последнего локального снять нельзя.
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _roles.UnassignAsync(local.Id, Admin));
+        Assert.Equal(1, await _roles.CountActiveAdministratorsAsync());
+    }
+
+    [Fact]
     public async Task Removing_principal_drops_its_assignments()
     {
         await AssignAdmin("u-admin");

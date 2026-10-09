@@ -73,11 +73,28 @@ public sealed class AccessServiceTests : IDisposable
         Seed(db =>
         {
             db.Roles.Add(new RoleEntity { Id = BuiltInRoles.AdministratorId, Name = BuiltInRoles.AdministratorName, IsBuiltin = true });
+            db.Users.Add(new UserEntity { Id = "u1", Login = "u1", PasswordHash = "x" });
             db.RoleAssignments.Add(new RoleAssignmentEntity { RoleId = BuiltInRoles.AdministratorId, PrincipalType = "LocalUser", PrincipalId = "u1", DisplayName = "u1" });
         });
 
         var p = await _access.GetAsync(new PrincipalRef(PrincipalType.LocalUser, "u1", []));
         Assert.All(Catalog.All, d => Assert.True(p.Has(d.Id)));
+    }
+
+    [Fact]
+    public async Task Disabled_or_missing_local_user_has_no_permissions()
+    {
+        var role = Role("R", PermissionIds.ServicesRead);
+        Seed(db =>
+        {
+            db.Roles.Add(role);
+            db.Users.Add(new UserEntity { Id = "off", Login = "off", PasswordHash = "x", IsActive = false });
+            db.RoleAssignments.Add(new RoleAssignmentEntity { RoleId = role.Id, PrincipalType = "LocalUser", PrincipalId = "off", DisplayName = "off" });
+            db.RoleAssignments.Add(new RoleAssignmentEntity { RoleId = role.Id, PrincipalType = "LocalUser", PrincipalId = "gone", DisplayName = "gone" });
+        });
+
+        Assert.False((await _access.GetAsync(new PrincipalRef(PrincipalType.LocalUser, "off", []))).Has(PermissionIds.ServicesRead));
+        Assert.False((await _access.GetAsync(new PrincipalRef(PrincipalType.LocalUser, "gone", []))).Has(PermissionIds.ServicesRead));
     }
 
     [Fact]

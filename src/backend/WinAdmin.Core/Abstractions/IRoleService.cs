@@ -22,6 +22,16 @@ public interface IRoleService
     /// <summary>409, если субъект — последний активный администратор.</summary>
     Task EnsureNotLastAdministratorAsync(PrincipalType type, string principalId, CancellationToken ct = default);
 
+    /// <summary>
+    /// Управлять субъектом (пароль, отключение, удаление, отзыв) можно, только если все его роли
+    /// в пределах прав действующего лица — иначе AccessDeniedException (иначе сброс пароля
+    /// администратора был бы путём к его правам).
+    /// </summary>
+    Task DemandControlOverAsync(PrincipalType type, string principalId, IAccessContext actor, CancellationToken ct = default);
+
+    /// <summary>Сколько активных субъектов с ролью «Администратор» (для предупреждения при старте).</summary>
+    Task<int> CountActiveAdministratorsAsync(CancellationToken ct = default);
+
     /// <summary>Удаляет все назначения субъекта (при удалении пользователя/ключа).</summary>
     Task RemovePrincipalAsync(PrincipalType type, string principalId, CancellationToken ct = default);
 }

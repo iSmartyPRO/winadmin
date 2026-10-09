@@ -5,6 +5,7 @@ import {
 import type { DataNode } from 'antd/es/tree'
 import { DeleteOutlined, EditOutlined, PlusOutlined, TeamOutlined } from '@ant-design/icons'
 import { useApi } from '../hooks/useApi'
+import { useAuth } from '../auth/AuthProvider'
 import { api } from '../api/client'
 import type { PermissionGroupDto, PrincipalType, RoleAssignmentDto, RoleDto, RoleGrantDto } from '../api/types'
 import PageHeader from '../components/PageHeader'
@@ -188,6 +189,7 @@ function AssignmentsDrawer({ role, open, onClose, onChanged }: {
 export default function Roles() {
   const { data, loading, refresh } = useApi(api.roles.list)
   const { data: groups } = useApi(api.permissions)
+  const { reload } = useAuth()
   const { message } = App.useApp()
   const [editing, setEditing] = useState<RoleDto | undefined>()
   const [editorOpen, setEditorOpen] = useState(false)
@@ -204,6 +206,7 @@ export default function Roles() {
       await api.roles.remove(r.id)
       message.success('Роль удалена')
       await refresh(true)
+      await reload()
     } catch (e) {
       message.error(errorText(e, 'Не удалось удалить роль'))
     }
@@ -264,8 +267,8 @@ export default function Roles() {
           ]}
         />
       </Card>
-      <RoleEditor role={editing} groups={groups ?? []} open={editorOpen} onClose={() => setEditorOpen(false)} onSaved={() => refresh(true)} />
-      <AssignmentsDrawer role={assigning} open={Boolean(assigning)} onClose={() => setAssigning(undefined)} onChanged={() => refresh(true)} />
+      <RoleEditor role={editing} groups={groups ?? []} open={editorOpen} onClose={() => setEditorOpen(false)} onSaved={() => { refresh(true); reload() }} />
+      <AssignmentsDrawer role={assigning} open={Boolean(assigning)} onClose={() => setAssigning(undefined)} onChanged={() => { refresh(true); reload() }} />
     </>
   )
 }

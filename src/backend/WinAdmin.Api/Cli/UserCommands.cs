@@ -153,7 +153,12 @@ public static class UserCommands
             var users = await GetService(provider).ListAsync();
             var user = users.FirstOrDefault(u => u.Login == login);
             if (user is null) { Console.Error.WriteLine($"Пользователь '{login}' не найден."); return; }
-            await GetService(provider).DeleteAsync(user.Id);
+            using var scope = provider.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<WinAdminDbContext>();
+            await scope.ServiceProvider.GetRequiredService<IUserService>().DeleteAsync(user.Id);
+            string local = nameof(PrincipalType.LocalUser);
+            db.RoleAssignments.RemoveRange(db.RoleAssignments.Where(a => a.PrincipalType == local && a.PrincipalId == user.Id));
+            await db.SaveChangesAsync();
             Console.WriteLine($"Пользователь '{login}' удалён.");
         }, loginArg);
         return cmd;

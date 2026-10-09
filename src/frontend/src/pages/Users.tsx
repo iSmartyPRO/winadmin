@@ -4,6 +4,7 @@ import { PlusOutlined, EditOutlined, DeleteOutlined, StopOutlined, PlayCircleOut
 import { AgGridReact } from 'ag-grid-react'
 import type { ColDef } from 'ag-grid-community'
 import { api } from '../api/client'
+import { useAuth } from '../auth/AuthProvider'
 import type { RoleAssignmentDto, RoleDto, UserDto } from '../api/types'
 
 const { Title } = Typography
@@ -15,6 +16,8 @@ function errorText(e: any, fallback: string) {
 
 export default function Users() {
   const { message } = App.useApp()
+  const { can, reload } = useAuth()
+  const canGrant = can('platform.roles.manage')
   const [users, setUsers] = useState<UserDto[]>([])
   const [roles, setRoles] = useState<RoleDto[]>([])
   const [loading, setLoading] = useState(true)
@@ -48,7 +51,7 @@ export default function Users() {
 
   const handleCreate = async (values: { login: string; password: string; roleIds: string[] }) => {
     try {
-      await api.createUser(values)
+      await api.createUser({ ...values, roleIds: values.roleIds ?? [] })
       message.success('Пользователь создан')
       setCreateOpen(false)
       createForm.resetFields()
@@ -75,6 +78,7 @@ export default function Users() {
       for (const id of [...wanted].filter((x) => !current.has(x))) await api.assignments.create(id, 'LocalUser', selected.id)
       message.success('Роли обновлены')
       setRolesOpen(false)
+      reload()
     } catch (e) {
       message.error(errorText(e, 'Не удалось изменить роли'))
     } finally {
@@ -133,7 +137,7 @@ export default function Users() {
       headerName: 'Действия', width: 230, sortable: false,
       cellRenderer: ({ data }: { data: UserDto }) => (
         <Space>
-          <Button size="small" icon={<SafetyCertificateOutlined />} onClick={() => openRoles(data)}>Роли</Button>
+          {canGrant && <Button size="small" icon={<SafetyCertificateOutlined />} onClick={() => openRoles(data)}>Роли</Button>}
           <Button size="small" icon={<EditOutlined />} onClick={() => {
             setSelected(data)
             setPasswordOpen(true)
@@ -171,9 +175,11 @@ export default function Users() {
           <Form.Item name="password" label="Пароль" rules={[{ required: true, min: 6 }]}>
             <Input.Password />
           </Form.Item>
-          <Form.Item name="roleIds" label="Роли" initialValue={[]}>
-            <Select mode="multiple" options={roleOptions} placeholder="Выберите роли" />
-          </Form.Item>
+          {canGrant && (
+            <Form.Item name="roleIds" label="Роли" initialValue={[]}>
+              <Select mode="multiple" options={roleOptions} placeholder="Выберите роли" />
+            </Form.Item>
+          )}
           <Button type="primary" htmlType="submit" block>Создать</Button>
         </Form>
       </Modal>

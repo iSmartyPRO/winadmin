@@ -32,6 +32,8 @@ public sealed class ApiKeysController(IApiKeyService keys, IAuditService audit, 
         if (request.RoleIds.Count == 0)
             return BadRequest(OperationResult.Fail("Выберите хотя бы одну роль"));
         var actor = await contexts.CreateAsync(User, ct) ?? throw new AccessDeniedException("Не удалось определить пользователя.", []);
+        if (!actor.Permissions.Has(PermissionIds.PlatformRolesManage))
+            return StatusCode(StatusCodes.Status403Forbidden, OperationResult.Fail("Выдавать роли ключам может только тот, у кого есть право управления ролями."));
 
         var created = await keys.CreateAsync(request, ct);
         var granted = new List<string>();
@@ -58,6 +60,8 @@ public sealed class ApiKeysController(IApiKeyService keys, IAuditService audit, 
     [HttpDelete("{id}")]
     public async Task<IActionResult> Revoke(string id, CancellationToken ct)
     {
+        var actor = await contexts.CreateAsync(User, ct) ?? throw new AccessDeniedException("Не удалось определить пользователя.", []);
+        await roles.DemandControlOverAsync(PrincipalType.ApiKey, id, actor, ct);
         await roles.EnsureNotLastAdministratorAsync(PrincipalType.ApiKey, id, ct);
         bool ok = await keys.RevokeAsync(id, ct);
         await audit.WriteAsync(new AuditEntryDto { Actor = Actor, Action = "apikey.revoke", Target = id, Success = ok, SourceIp = SourceIp }, ct);

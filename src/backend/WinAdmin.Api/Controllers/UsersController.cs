@@ -10,7 +10,7 @@ namespace WinAdmin.Api.Controllers;
 [RequirePermission(PermissionIds.PlatformUsersManage)]
 [PlatformErrors]
 [Route("api/v1/users")]
-public sealed class UsersController(IUserService users, IRoleService roles, AccessContextFactory contexts) : WinAdminControllerBase
+public sealed class UsersController(IUserService users, IRoleService roles, IAccessService access, AccessContextFactory contexts) : WinAdminControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<UserDto>>> List(CancellationToken ct)
@@ -28,7 +28,9 @@ public sealed class UsersController(IUserService users, IRoleService roles, Acce
     {
         if (string.IsNullOrWhiteSpace(request.Login) || string.IsNullOrEmpty(request.Password))
             return BadRequest(new { message = "Укажите логин и пароль." });
-        var actor = await contexts.CreateAsync(User, ct) ?? throw new AccessDeniedException("Не удалось определить пользователя.", []);
+        var actor = await ActorAsync(ct);
+        if (request.RoleIds.Count > 0 && !actor.Permissions.Has(PermissionIds.PlatformRolesManage))
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = "Выдавать роли может только тот, у кого есть право управления ролями." });
 
         UserDto dto;
         try
@@ -56,24 +58,39 @@ public sealed class UsersController(IUserService users, IRoleService roles, Acce
         return StatusCode(StatusCodes.Status201Created, dto with { Roles = granted });
     }
 
+    private async Task<IAccessContext> ActorAsync(CancellationToken ct)
+        => await contexts.CreateAsync(User, ct) ?? throw new AccessDeniedException("Не удалось определить пользователя.", []);
+
+    /// <summary>Нельзя управлять пользователем, чьи роли шире прав действующего лица.</summary>
+    private async Task DemandControlAsync(string id, CancellationToken ct)
+        => await roles.DemandControlOverAsync(PrincipalType.LocalUser, id, await ActorAsync(ct), ct);
+
     [HttpPut("{id}/password")]
     public async Task<IActionResult> ChangePassword(string id, [FromBody] ChangePasswordRequest request, CancellationToken ct)
-        => await users.ChangePasswordAsync(id, request.NewPassword, ct) ? NoContent() : NotFound();
+    {
+        await DemandControlAsync(id, ct);
+        return await users.ChangePasswordAsync(id, request.NewPassword, ct) ? NoContent() : NotFound();
+    }
 
     [HttpPut("{id}/active")]
     public async Task<IActionResult> SetActive(string id, [FromBody] SetActiveRequest request, CancellationToken ct)
     {
+        await DemandControlAsync(id, ct);
         if (!request.IsActive)
             await roles.EnsureNotLastAdministratorAsync(PrincipalType.LocalUser, id, ct);
-        return await users.SetActiveAsync(id, request.IsActive, ct) ? NoContent() : NotFound();
+        if (!await users.SetActiveAsync(id, request.IsActive, ct)) return NotFound();
+        access.Invalidate();
+        return NoContent();
     }
 
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(string id, CancellationToken ct)
     {
+        await DemandControlAsync(id, ct);
         await roles.EnsureNotLastAdministratorAsync(PrincipalType.LocalUser, id, ct);
         if (!await users.DeleteAsync(id, ct)) return NotFound();
         await roles.RemovePrincipalAsync(PrincipalType.LocalUser, id, ct);
+        access.Invalidate();
         return NoContent();
     }
 }

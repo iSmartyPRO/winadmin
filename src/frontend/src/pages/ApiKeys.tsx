@@ -8,6 +8,7 @@ import type { ColumnsType } from 'antd/es/table'
 import type { Dayjs } from 'dayjs'
 import { api } from '../api/client'
 import { useApi } from '../hooks/useApi'
+import { useAuth } from '../auth/AuthProvider'
 import type { ApiKeyDto } from '../api/types'
 import PageHeader from '../components/PageHeader'
 import { formatDateTime } from '../utils/format'
@@ -18,6 +19,7 @@ export default function ApiKeys() {
   const { data, loading, refresh } = useApi(api.apiKeys)
   const { data: roles } = useApi(api.roles.list)
   const { message } = App.useApp()
+  const canGrant = useAuth().can('platform.roles.manage')
   const [form] = Form.useForm()
   const [open, setOpen] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -96,7 +98,9 @@ export default function ApiKeys() {
         subtitle="Доступ внешних систем к API"
         onRefresh={refresh}
         loading={loading}
-        extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>Создать ключ</Button>}
+        extra={<Button type="primary" icon={<PlusOutlined />} disabled={!canGrant}
+          title={canGrant ? undefined : 'Ключу нужна роль, а выдавать роли может только тот, у кого есть право управления ролями'}
+          onClick={() => setOpen(true)}>Создать ключ</Button>}
       />
 
       <Card variant="borderless" className="sp-glass">

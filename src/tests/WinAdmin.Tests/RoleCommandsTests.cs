@@ -77,6 +77,15 @@ public sealed class RoleCommandsTests : IDisposable
     }
 
     [Fact]
+    public async Task User_delete_removes_role_assignments()
+    {
+        await _root.InvokeAsync(["user", "add", "--login", "tmp", "--password", "Tmp-1234567", "--role", "Администратор"]);
+        await _root.InvokeAsync(["user", "add", "--login", "keep", "--password", "Keep-123456", "--role", "Администратор"]);
+        Assert.Equal(0, await _root.InvokeAsync(["user", "delete", "tmp"]));
+        Assert.Equal(0, Db(db => db.RoleAssignments.Count(a => a.DisplayName == "tmp")));
+    }
+
+    [Fact]
     public async Task Role_assign_is_the_emergency_path()
     {
         await _root.InvokeAsync(["user", "add", "--login", "late", "--password", "Late-123456"]);

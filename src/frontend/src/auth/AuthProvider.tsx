@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
 import { authApi } from '../api/authApi'
-import { authEvents, clearStoredToken, getStoredToken } from '../api/client'
+import { api, authEvents, clearStoredToken, getStoredToken } from '../api/client'
 import type { MeResponse } from '../api/types'
 
 interface AuthState {
@@ -11,6 +11,8 @@ interface AuthState {
   /** Включён ли модуль. */
   moduleOn: (moduleId: string) => boolean
   logout: () => Promise<void>
+  /** Перечитать /me (после изменения ролей или модулей). */
+  reload: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthState | null>(null)
@@ -25,9 +27,17 @@ export function AuthProvider({ children, onLogout }: { children: ReactNode; onLo
   const [user, setUser] = useState<MeResponse | null>(null)
   const token = getStoredToken()
 
-  useEffect(() => {
-    authApi.me(token).then(setUser).catch(() => setUser(null))
-  }, [token])
+  // Через axios: истёкший токен обновляется, а при окончательной ошибке — выход, а не вечная загрузка.
+  const reload = useCallback(async () => {
+    try {
+      setUser(await api.me())
+    } catch {
+      clearStoredToken()
+      onLogout()
+    }
+  }, [onLogout])
+
+  useEffect(() => { reload() }, [token, reload])
 
   useEffect(() => {
     const onUnauthorized = () => {
@@ -48,7 +58,7 @@ export function AuthProvider({ children, onLogout }: { children: ReactNode; onLo
   const moduleOn = useCallback((id: string) => Boolean(user?.modules.some((m) => m.id === id)), [user])
 
   return (
-    <AuthContext.Provider value={{ user, token, can, moduleOn, logout }}>
+    <AuthContext.Provider value={{ user, token, can, moduleOn, logout, reload }}>
       {children}
     </AuthContext.Provider>
   )

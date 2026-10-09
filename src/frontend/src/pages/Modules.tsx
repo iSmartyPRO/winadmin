@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Alert, App, Button, Card, Col, Form, Input, InputNumber, Row, Select, Space, Switch, Tag, Tooltip, Typography } from 'antd'
 import { useApi } from '../hooks/useApi'
+import { useAuth } from '../auth/AuthProvider'
 import { api } from '../api/client'
 import type { ModuleDto, SettingsField } from '../api/types'
 import PageHeader from '../components/PageHeader'
@@ -57,6 +58,7 @@ function SettingsForm({ module, onSaved }: { module: ModuleDto; onSaved: () => v
 
 export default function Modules() {
   const { data, loading, refresh } = useApi(api.modules.list)
+  const { reload } = useAuth()
   const { message } = App.useApp()
   const [busy, setBusy] = useState<string>()
 
@@ -66,6 +68,7 @@ export default function Modules() {
       await api.modules.update(m.id, { enabled })
       message.success(enabled ? `Модуль «${m.title}» включён` : `Модуль «${m.title}» выключен`)
       await refresh(true)
+      await reload() // меню и маршруты зависят от включённых модулей
     } catch (e: any) {
       message.error(e?.response?.data?.message ?? 'Не удалось изменить модуль')
     } finally {

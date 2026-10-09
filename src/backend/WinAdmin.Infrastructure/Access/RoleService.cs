@@ -127,6 +127,19 @@ public sealed class RoleService(WinAdminDbContext db, PermissionCatalog catalog,
             throw new InvalidOperationException("Это последний активный администратор WinAdmin — сначала назначьте роль «Администратор» другому.");
     }
 
+    public async Task DemandControlOverAsync(PrincipalType type, string principalId, IAccessContext actor, CancellationToken ct = default)
+    {
+        string t = type.ToString();
+        var roleIds = await db.RoleAssignments.AsNoTracking()
+            .Where(a => a.PrincipalType == t && a.PrincipalId == principalId).Select(a => a.RoleId).ToListAsync(ct);
+        var roles = await db.Roles.AsNoTracking().Include(r => r.Permissions).Where(r => roleIds.Contains(r.Id)).ToListAsync(ct);
+        foreach (var role in roles)
+            Demand(actor, GrantsOf(role));
+    }
+
+    public Task<int> CountActiveAdministratorsAsync(CancellationToken ct = default)
+        => CountActiveAdministratorsAsync(null, ct);
+
     public async Task RemovePrincipalAsync(PrincipalType type, string principalId, CancellationToken ct = default)
     {
         string t = type.ToString();
@@ -227,7 +240,8 @@ public sealed class RoleService(WinAdminDbContext db, PermissionCatalog catalog,
                 nameof(PrincipalType.LocalUser) => await db.Users.AnyAsync(u => u.Id == a.PrincipalId && u.IsActive, ct),
                 nameof(PrincipalType.ApiKey) => (await db.ApiKeys.AsNoTracking().FirstOrDefaultAsync(k => k.Id == a.PrincipalId, ct))
                     is { IsRevoked: false } k && (k.ExpiresAt is null || k.ExpiresAt > now),
-                _ => true,
+                // До входа через AD (план 1c) такие назначения не дают никому управлять WinAdmin.
+                _ => false,
             };
             if (isActive) active++;
         }

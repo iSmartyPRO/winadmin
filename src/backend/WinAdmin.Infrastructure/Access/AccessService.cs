@@ -32,6 +32,15 @@ public sealed class AccessService(IServiceScopeFactory scopes, PermissionCatalog
 
         using var scope = scopes.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<WinAdminDbContext>();
+
+        // Отключённый (или удалённый) локальный пользователь не имеет прав даже с действующим JWT.
+        if (principal.Type == PrincipalType.LocalUser
+            && !await db.Users.AnyAsync(u => u.Id == principal.Id && u.IsActive, ct))
+        {
+            _cache[key] = (now, EffectivePermissions.None);
+            return EffectivePermissions.None;
+        }
+
         string type = principal.Type.ToString();
         string groupType = PrincipalType.AdGroup.ToString();
         var groups = principal.GroupSids.ToList();
