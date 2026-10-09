@@ -30,6 +30,7 @@ public sealed class NetworkApiFactory : WebApplicationFactory<Program>
     public FakeDirectory Directory { get; } = new();
     public FakeWindowsReader Windows { get; } = new();
     public FakeAdReader AdReader { get; } = new();
+    public FakeAdDomain AdDomain { get; } = new();
     public DirectorySettings DirectorySettings { get; set; } = new(true, "test.local", null, null, false);
 
     /// <summary>Клиент, чьи запросы сервер видит пришедшими с указанного адреса (только в тестах).</summary>
@@ -71,6 +72,12 @@ public sealed class NetworkApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<IStartupFilter, TestRemoteIp>();
             var monitor = services.SingleOrDefault(d => d.ImplementationType == typeof(WinAdmin.Infrastructure.EnvironmentChecks.EnvironmentMonitor));
             if (monitor is not null) services.Remove(monitor);
+            services.RemoveAll<IAdUserDirectory>();
+            services.AddSingleton<IAdUserDirectory>(AdDomain);
+            services.RemoveAll<IAdWriter>();
+            services.AddSingleton<IAdWriter>(AdDomain);
+            services.RemoveAll<IMachineInfo>();
+            services.AddSingleton(Mock.Of<IMachineInfo>(m => m.IsDomainJoined == true && m.IsWindowsServer == true && m.DomainName == "test.local"));
             services.RemoveAll<IAdReader>();
             services.AddSingleton<IAdReader>(AdReader);
             services.RemoveAll<IWindowsSignInReader>();
