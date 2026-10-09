@@ -65,6 +65,7 @@ public static class DependencyInjection
             sp.GetRequiredService<IDirectorySettingsStore>(), sp.GetRequiredService<IAdStructureStore>()));
         services.AddSingleton<IEnvironmentService, EnvironmentService>();
         services.AddSingleton<IEnvironmentCheck, PlatformAdCheck>();
+        services.AddSingleton<IEnvironmentCheck, AdUsersCheck>();
         services.AddSingleton<IAdReader>(sp => new LdapAdReader(
             sp.GetRequiredService<IDirectorySettingsStore>(), sp.GetRequiredService<IAdStructureStore>()));
         services.AddSingleton<IAdGroupCache, AdGroupCache>();
