@@ -43,6 +43,24 @@ public sealed class DatabaseSettingsStoreTests : IDisposable
     }
 
     [Fact]
+    public void Written_file_has_its_own_protected_acl()
+    {
+        Store().Write(new DatabaseSettings(DatabaseProvider.Sqlite, "Data Source=x.db"));
+        var acl = new FileInfo(Store().FilePath).GetAccessControl();
+        Assert.True(acl.AreAccessRulesProtected);
+        Assert.DoesNotContain(acl.GetAccessRules(true, true, typeof(System.Security.Principal.SecurityIdentifier))
+            .Cast<System.Security.AccessControl.FileSystemAccessRule>(), r => r.IdentityReference.Value == "S-1-5-32-545");
+    }
+
+    [Fact]
+    public void Detects_encrypted_values_without_a_key()
+    {
+        Assert.False(DatabaseSettingsStore.FileHasProtectedValues(_dir));
+        File.WriteAllText(Store().FilePath, "{ \"provider\": \"postgresql\", \"connectionString\": \"Password=enc:v1:AAAA\" }");
+        Assert.True(DatabaseSettingsStore.FileHasProtectedValues(_dir));
+    }
+
+    [Fact]
     public void Hand_written_plaintext_password_still_works()
     {
         File.WriteAllText(Store().FilePath,

@@ -1,7 +1,10 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 using WinAdmin.Core.Abstractions;
+using WinAdmin.Infrastructure.Hardening;
+using WinAdmin.Infrastructure.Secrets;
 
 namespace WinAdmin.Infrastructure.Storage;
 
@@ -75,7 +78,22 @@ public sealed class DatabaseSettingsStore(string dataDirectory, ISecretProtector
         Directory.CreateDirectory(dataDirectory);
         string tmp = FilePath + ".tmp";
         File.WriteAllText(tmp, json.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+        InstallationHardening.ProtectFile(tmp, MasterKeyStore.KeyFileRules(), NullLogger.Instance);
         File.Move(tmp, FilePath, overwrite: true);
+    }
+
+    /// <summary>Есть ли в database.json зашифрованные значения (без расшифровки и без ключа).</summary>
+    public static bool FileHasProtectedValues(string dataDirectory)
+    {
+        string path = Path.Combine(dataDirectory, FileName);
+        try
+        {
+            return File.Exists(path) && File.ReadAllText(path).Contains(ProtectedValue.Prefix, StringComparison.Ordinal);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return true; // не можем проверить — считаем, что есть, и не выпускаем новый ключ
+        }
     }
 
     /// <summary>Строка подключения для использования: пароль расшифрован.</summary>

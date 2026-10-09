@@ -31,6 +31,12 @@ public static class KeysCommands
                 ctx.ExitCode = 1;
                 return;
             }
+            if (!store.Exists)
+            {
+                error.WriteLine($"Ключ {store.FilePath} не найден — экспортировать нечего.");
+                ctx.ExitCode = 1;
+                return;
+            }
             try
             {
                 string file = ctx.ParseResult.GetValueForOption(fileOpt)!;

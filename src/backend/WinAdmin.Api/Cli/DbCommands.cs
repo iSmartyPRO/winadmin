@@ -13,7 +13,7 @@ public static class DbCommands
     {
         var o = output ?? Console.Out;
         var e = error ?? Console.Error;
-        db.AddCommand(Show(store, defaultSqlitePath, o));
+        db.AddCommand(Show(store, defaultSqlitePath, o, e));
         db.AddCommand(Set(store, defaultSqlitePath, o, e));
     }
 
@@ -26,13 +26,22 @@ public static class DbCommands
             new DbContextOptionsBuilder<SqliteWinAdminDbContext>().UseSqlite(resolved.ConnectionString).Options),
     };
 
-    private static Command Show(DatabaseSettingsStore store, string defaultSqlitePath, TextWriter output)
+    private static Command Show(DatabaseSettingsStore store, string defaultSqlitePath, TextWriter output, TextWriter error)
     {
         var cmd = new Command("show", "Показать текущую базу данных");
-        cmd.SetHandler(() =>
+        cmd.SetHandler((InvocationContext ctx) =>
         {
             output.WriteLine($"Файл:   {store.FilePath}{(store.Exists ? "" : " (нет — используется значение по умолчанию)")}");
-            output.WriteLine($"База:   {DatabaseSettingsStore.Describe(store.Read(defaultSqlitePath))}");
+            try
+            {
+                output.WriteLine($"База:   {DatabaseSettingsStore.Describe(store.Read(defaultSqlitePath))}");
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+            {
+                error.WriteLine(ex.Message);
+                error.WriteLine("Задайте базу заново: WinAdmin.exe db set --provider sqlite | postgresql …");
+                ctx.ExitCode = 1;
+            }
         });
         return cmd;
     }
@@ -77,24 +86,39 @@ public static class DbCommands
                 settings = new DatabaseSettings(provider, connection);
             }
 
-            var previous = store.Read(defaultSqlitePath);
+            // Испорченный database.json не должен мешать его исправлению.
+            string? previous;
+            try { previous = DatabaseSettingsStore.Describe(store.Read(defaultSqlitePath)); }
+            catch (Exception ex) when (ex is InvalidOperationException or ArgumentException) { previous = null; }
+
             try
             {
                 await using var db = CreateContext(settings);
                 await db.Database.MigrateAsync();
             }
-            catch (Exception ex) when (ex is NpgsqlException or Microsoft.Data.Sqlite.SqliteException
-                                           or InvalidOperationException or ArgumentException or TimeoutException)
+            catch (Exception ex)
             {
+                // Выводится только сообщение (пароль в сообщения Npgsql не попадает).
                 error.WriteLine($"Не удалось подключиться к базе: {ex.GetBaseException().Message}");
                 error.WriteLine("Настройки не изменены.");
                 ctx.ExitCode = 1;
                 return;
             }
 
-            store.Write(settings);
+            try
+            {
+                store.Write(settings);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException
+                                           or WinAdmin.Core.Abstractions.SecretUnavailableException)
+            {
+                error.WriteLine($"Не удалось сохранить {store.FilePath}: {ex.Message}");
+                error.WriteLine("Запустите консоль от имени администратора.");
+                ctx.ExitCode = 1;
+                return;
+            }
             output.WriteLine($"Сохранено: {DatabaseSettingsStore.Describe(settings)}");
-            if (DatabaseSettingsStore.Describe(previous) != DatabaseSettingsStore.Describe(settings))
+            if (previous != DatabaseSettingsStore.Describe(settings))
                 output.WriteLine("Данные из прежней базы не переносятся.");
             output.WriteLine("Перезапустите службу WinAdmin, чтобы она подключилась к новой базе.");
         });

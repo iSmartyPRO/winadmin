@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting.WindowsServices;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using WinAdmin.Api;
 using WinAdmin.Api.Auth;
 using WinAdmin.Api.Network;
 using WinAdmin.Core.Abstractions;
@@ -52,25 +53,32 @@ string dataDirectory = WinAdminPaths.DataDirectory(dbPath);
 
 // Ключ шифрования секретов (keys\master.key под DPAPI машины).
 string keysDirectory = Path.Combine(dataDirectory, "keys");
-ISecretProtector secretProtector;
+// Новый ключ выпускается только на чистой установке (см. SecretProtectorFactory).
+ISecretProtector secretProtector = SecretProtectorFactory.Open(new MasterKeyStore(keysDirectory), dataDirectory, out var keyProblem);
+if (keyProblem is not null)
+    StartupDiagnostics.Warn(keyProblem);
+
+// Провайдер БД: database.json (sqlite | postgresql), по умолчанию — SQLite по WinAdmin:DatabasePath.
+// Без базы прав нет — при ошибке служба не стартует, но с понятным сообщением (и в журнале событий).
+var databaseStore = new DatabaseSettingsStore(dataDirectory, secretProtector);
+DatabaseSettings database;
 try
 {
-    secretProtector = new AesGcmSecretProtector(new MasterKeyStore(keysDirectory).LoadOrCreate());
+    var storedDatabase = databaseStore.Read(dbPath);
+    if (!databaseStore.Exists)
+    {
+        try { databaseStore.Write(storedDatabase); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SecretUnavailableException)
+        {
+            StartupDiagnostics.Warn($"Не удалось создать {databaseStore.FilePath}: {ex.Message}");
+        }
+    }
+    database = databaseStore.ResolveForUse(storedDatabase);
 }
-catch (Exception ex) when (ex is SecretUnavailableException or IOException or UnauthorizedAccessException)
+catch (Exception ex) when (ex is SecretUnavailableException or InvalidOperationException or ArgumentException)
 {
-    Console.WriteLine($"Ключ шифрования недоступен: {ex.Message}");
-    secretProtector = new UnavailableSecretProtector(ex.Message);
+    return StartupDiagnostics.Fail($"WinAdmin не запущен: база данных не настроена. {ex.Message}");
 }
-// Провайдер БД: database.json (sqlite | postgresql), по умолчанию — SQLite по WinAdmin:DatabasePath.
-var databaseStore = new DatabaseSettingsStore(dataDirectory, secretProtector);
-var storedDatabase = databaseStore.Read(dbPath);
-if (!databaseStore.Exists)
-{
-    try { databaseStore.Write(storedDatabase); }
-    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Console.WriteLine($"Не удалось создать {databaseStore.FilePath}: {ex.Message}"); }
-}
-DatabaseSettings database = databaseStore.ResolveForUse(storedDatabase);
 
 // Сетевые настройки: network.json рядом с БД → Kestrel:Endpoints (перепривязка на лету).
 // Порт из старого --urls используется только при первом создании файла.
@@ -82,7 +90,7 @@ try
 }
 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
 {
-    Console.WriteLine($"Не удалось создать {networkStore.FilePath}: {ex.Message}. Используется 127.0.0.1:{NetworkEndpoints.DefaultPort}.");
+    StartupDiagnostics.Warn($"Не удалось создать {networkStore.FilePath}: {ex.Message}. Используется 127.0.0.1:{NetworkEndpoints.DefaultPort}.");
 }
 var networkSource = new NetworkConfigurationSource(networkStore);
 builder.Configuration.Sources.Add(networkSource);
@@ -98,7 +106,7 @@ try
 catch (Exception ex) when (ex is SecretUnavailableException or IOException or UnauthorizedAccessException)
 {
     jwtOptions.Secret = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
-    Console.WriteLine($"JWT-секрет не сохранён ({ex.Message}) — используется временный, сессии сбросятся при перезапуске.");
+    StartupDiagnostics.Warn($"JWT-секрет не сохранён ({ex.Message}) — используется временный, сессии сбросятся при перезапуске.");
 }
 
 // ── Сервисы ─────────────────────────────────────────────────────
@@ -242,6 +250,8 @@ using (var scope = app.Services.CreateScope())
         app.Logger.LogWarning("════════════════════════════════════════════════════");
     }
 }
+
+StartupDiagnostics.Flush(app.Logger);
 
 // ── Сеть ─────────────────────────────────────────────────────────
 if (networkSource.Provider?.LastError is { } networkError)

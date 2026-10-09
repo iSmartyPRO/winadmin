@@ -47,6 +47,6 @@ public sealed class StartupHardeningTests : IDisposable
 
         Assert.False(UsersCanRead(keys.FilePath));
         Assert.False(UsersCanRead(bootstrap));
-        Assert.Equal(keys.Load().Length, 32); // процесс по-прежнему читает ключ
+        Assert.Equal(32, keys.Load().Length); // процесс по-прежнему читает ключ
     }
 }

@@ -14,30 +14,38 @@ public static class CliRunner
 {
     public static async Task<int> RunAsync(string[] args, IConfiguration config)
     {
-        // Minimal DI — DB + user service + network settings
-        var services = new ServiceCollection();
         string dbPath = WinAdminPaths.DatabasePath(config["WinAdmin:DatabasePath"]);
         string dataDirectory = WinAdminPaths.DataDirectory(dbPath);
         var keys = new MasterKeyStore(Path.Combine(dataDirectory, "keys"));
-        ISecretProtector protector = keys.Exists || args is ["user", ..] or ["db", ..] or ["keys", "export", ..]
-            ? new AesGcmSecretProtector(keys.LoadOrCreate())
-            : new UnavailableSecretProtector($"Ключ шифрования {keys.FilePath} не найден.");
+        // Ключ открывается только когда он действительно нужен: keys import, network, db show
+        // должны работать и при недоступном ключе — именно ими его восстанавливают.
+        ISecretProtector protector = new LazySecretProtector(() => SecretProtectorFactory.Open(keys, dataDirectory, out _));
         var databaseStore = new DatabaseSettingsStore(dataDirectory, protector);
 
-        services.AddSingleton(protector);
-        if (args is ["user", ..])
-            services.AddWinAdminDatabase(databaseStore.ResolveForUse(databaseStore.Read(dbPath)));
-        services.AddScoped<IUserService, UserService>();
-        services.AddWinAdminNetwork(new NetworkSettingsStore(dataDirectory));
-
-        var provider = services.BuildServiceProvider();
-
-        // Ensure DB is up to date (only user commands need the DB)
-        if (args.Length > 0 && args[0] == "user")
+        // Minimal DI — DB (для user) + user service + network settings
+        ServiceProvider provider;
+        try
         {
-            using var scope = provider.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<WinAdminDbContext>();
-            await db.Database.MigrateAsync();
+            var services = new ServiceCollection();
+            services.AddSingleton(protector);
+            if (args is ["user", ..])
+                services.AddWinAdminDatabase(databaseStore.ResolveForUse(databaseStore.Read(dbPath)));
+            services.AddScoped<IUserService, UserService>();
+            services.AddWinAdminNetwork(new NetworkSettingsStore(dataDirectory));
+            provider = services.BuildServiceProvider();
+
+            if (args is ["user", ..])
+            {
+                using var scope = provider.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<WinAdminDbContext>();
+                await db.Database.MigrateAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            // Ошибки конфигурации (ключ, database.json, недоступная БД) — понятным текстом, без стектрейса.
+            Console.Error.WriteLine(ex.GetBaseException().Message);
+            return 1;
         }
 
         var userCommand = new Command("user", "Управление пользователями");
