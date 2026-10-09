@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using WinAdmin.Core.Abstractions;
 using WinAdmin.Core.Models;
 using WinAdmin.Core.Security;
+using WinAdmin.Api.Auth;
+using WinAdmin.Api.Modules;
 
 namespace WinAdmin.Api.Controllers;
 
@@ -10,8 +12,9 @@ namespace WinAdmin.Api.Controllers;
 /// Настройки: чёрный список учётных записей, которые скрываются из журналов
 /// событий (требует scope admin).
 /// </summary>
-[Authorize(Policy = "scope:" + Scopes.Admin)]
+[RequirePermission(PermissionIds.EventLogsManage)]
 [Route("api/v1/settings/excluded-users")]
+[WinAdminModule("eventlogs")]
 public sealed class ExcludedUsersController : WinAdminControllerBase
 {
     private readonly IExcludedUserService _excluded;

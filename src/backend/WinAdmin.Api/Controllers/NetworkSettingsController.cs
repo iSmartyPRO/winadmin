@@ -5,6 +5,7 @@ using WinAdmin.Core.Abstractions;
 using WinAdmin.Core.Models;
 using WinAdmin.Core.Network;
 using WinAdmin.Core.Security;
+using WinAdmin.Api.Auth;
 
 namespace WinAdmin.Api.Controllers;
 
@@ -12,7 +13,7 @@ namespace WinAdmin.Api.Controllers;
 /// Сетевые настройки панели: режим (только этот компьютер / сеть), порт и разрешённые
 /// подсети (требует scope admin). Применяются без перезапуска службы.
 /// </summary>
-[Authorize(Policy = "scope:" + Scopes.Admin)]
+[RequirePermission(PermissionIds.PlatformNetworkManage)]
 [Route("api/v1/settings/network")]
 public sealed class NetworkSettingsController : WinAdminControllerBase
 {

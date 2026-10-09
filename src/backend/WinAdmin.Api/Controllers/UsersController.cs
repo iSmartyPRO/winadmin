@@ -3,11 +3,12 @@ using Microsoft.AspNetCore.Mvc;
 using WinAdmin.Core.Abstractions;
 using WinAdmin.Core.Models;
 using WinAdmin.Core.Security;
+using WinAdmin.Api.Auth;
 
 namespace WinAdmin.Api.Controllers;
 
 /// <summary>Управление пользователями (требует scope admin).</summary>
-[Authorize(Policy = "scope:" + Scopes.Admin)]
+[RequirePermission(PermissionIds.PlatformUsersManage)]
 [Route("api/v1/users")]
 public sealed class UsersController : WinAdminControllerBase
 {
@@ -37,13 +38,6 @@ public sealed class UsersController : WinAdminControllerBase
             return Conflict(new { message = $"Пользователь '{request.Login}' уже существует" });
         }
     }
-
-    /// <summary>Изменить scopes.</summary>
-    [HttpPut("{id}/scopes")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> UpdateScopes(string id, [FromBody] UpdateScopesRequest request, CancellationToken ct)
-        => await _users.UpdateScopesAsync(id, request.Scopes, ct) ? NoContent() : NotFound();
 
     /// <summary>Сменить пароль.</summary>
     [HttpPut("{id}/password")]

@@ -1,8 +1,7 @@
-﻿using Microsoft.Data.Sqlite;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using WinAdmin.Core.Models;
-using WinAdmin.Core.Security;
 using WinAdmin.Infrastructure.Security;
 using WinAdmin.Infrastructure.Storage;
 
@@ -25,26 +24,22 @@ public sealed class ApiKeyServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task Create_then_validate_returns_principal_with_scopes()
+    public async Task Create_then_validate_returns_principal()
     {
-        var created = await _service.CreateAsync(new CreateApiKeyRequest
-        {
-            Name = "test", Scopes = [Scopes.SystemRead, Scopes.DisksRead],
-        });
+        var created = await _service.CreateAsync(new CreateApiKeyRequest { Name = "test" });
 
         Assert.StartsWith("sp_", created.PlaintextKey);
 
         var principal = await _service.ValidateAsync(created.PlaintextKey);
         Assert.NotNull(principal);
         Assert.Equal("test", principal!.Name);
-        Assert.Contains(Scopes.SystemRead, principal.Scopes);
-        Assert.Contains(Scopes.DisksRead, principal.Scopes);
+        Assert.Equal(created.Key.Id, principal.Id);
     }
 
     [Fact]
     public async Task Validate_with_wrong_key_returns_null()
     {
-        await _service.CreateAsync(new CreateApiKeyRequest { Name = "x", Scopes = [Scopes.SystemRead] });
+        await _service.CreateAsync(new CreateApiKeyRequest { Name = "x" });
         Assert.Null(await _service.ValidateAsync("sp_definitely_wrong"));
         Assert.Null(await _service.ValidateAsync(""));
     }
@@ -52,7 +47,7 @@ public sealed class ApiKeyServiceTests : IDisposable
     [Fact]
     public async Task Revoked_key_no_longer_validates()
     {
-        var created = await _service.CreateAsync(new CreateApiKeyRequest { Name = "x", Scopes = [Scopes.Admin] });
+        var created = await _service.CreateAsync(new CreateApiKeyRequest { Name = "x" });
         Assert.NotNull(await _service.ValidateAsync(created.PlaintextKey));
 
         var ok = await _service.RevokeAsync(created.Key.Id);
@@ -65,19 +60,9 @@ public sealed class ApiKeyServiceTests : IDisposable
     {
         var created = await _service.CreateAsync(new CreateApiKeyRequest
         {
-            Name = "x", Scopes = [Scopes.SystemRead], ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-1),
+            Name = "x", ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-1),
         });
         Assert.Null(await _service.ValidateAsync(created.PlaintextKey));
-    }
-
-    [Fact]
-    public async Task Create_filters_unknown_scopes()
-    {
-        var created = await _service.CreateAsync(new CreateApiKeyRequest
-        {
-            Name = "x", Scopes = [Scopes.SystemRead, "not.a.real.scope"],
-        });
-        Assert.Equal([Scopes.SystemRead], created.Key.Scopes);
     }
 
     [Fact]
@@ -88,7 +73,8 @@ public sealed class ApiKeyServiceTests : IDisposable
 
         var principal = await _service.ValidateAsync(raw!);
         Assert.NotNull(principal);
-        Assert.Contains(Scopes.Admin, principal!.Scopes);
+        // Маркер для переноса в роль «Администратор» при старте (PlatformBootstrapper).
+        Assert.Equal("admin", _db.ApiKeys.Single().Scopes);
 
         // Повторный вызов не создаёт второй ключ.
         var second = await _service.EnsureBootstrapAsync(presetKey: null);

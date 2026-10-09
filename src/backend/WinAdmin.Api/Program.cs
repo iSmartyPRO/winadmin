@@ -11,6 +11,9 @@ using Microsoft.OpenApi;
 using WinAdmin.Api;
 using WinAdmin.Api.Auth;
 using WinAdmin.Api.Network;
+using WinAdmin.Infrastructure.Access;
+using WinAdmin.Core.Modules;
+using WinAdmin.Api.Modules;
 using WinAdmin.Core.Abstractions;
 using WinAdmin.Core.Models;
 using WinAdmin.Core.Network;
@@ -150,18 +153,13 @@ builder.Services
         };
     });
 
-builder.Services.AddSingleton<IAuthorizationHandler, ScopeAuthorizationHandler>();
 var authzBuilder = builder.Services.AddAuthorizationBuilder();
 authzBuilder.SetDefaultPolicy(new AuthorizationPolicyBuilder("Auto")
     .RequireAuthenticatedUser()
     .Build());
-foreach (var scope in Scopes.All)
-    authzBuilder.AddPolicy(ScopePolicy.Name(scope), p =>
-    {
-        p.AddAuthenticationSchemes("Auto");
-        p.RequireAuthenticatedUser();
-        p.AddRequirements(new ScopeRequirement(scope));
-    });
+builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
+builder.Services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
+builder.Services.AddSingleton<AccessContextFactory>();
 
 builder.Services.AddRateLimiter(options =>
 {
@@ -241,6 +239,8 @@ using (var scope = app.Services.CreateScope())
         app.Logger.LogWarning("Сохранён в {File}. Удалите файл после копирования.", file);
     }
 
+    await PlatformBootstrapper.RunAsync(db, scope.ServiceProvider.GetRequiredService<PermissionCatalog>());
+
     var users = scope.ServiceProvider.GetRequiredService<IUserService>();
     if (!await users.AnyAsync())
     {
@@ -290,6 +290,8 @@ app.UseStaticFiles();
 if (corsOrigins.Length > 0)
     app.UseCors();
 
+app.UseRouting();
+app.UseMiddleware<ModuleAvailabilityMiddleware>();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();

@@ -1,9 +1,8 @@
-﻿using System.Security.Cryptography;
+using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using WinAdmin.Core.Abstractions;
 using WinAdmin.Core.Models;
-using WinAdmin.Core.Security;
 using WinAdmin.Infrastructure.Storage;
 
 namespace WinAdmin.Infrastructure.Security;
@@ -29,19 +28,17 @@ public sealed class ApiKeyService : IApiKeyService
 
     public async Task<CreatedApiKey> CreateAsync(CreateApiKeyRequest request, CancellationToken ct = default)
     {
-        var scopes = NormalizeScopes(request.Scopes);
         string raw = GenerateKey();
         var entity = new ApiKeyEntity
         {
             Name = request.Name.Trim(),
             KeyHash = Hash(raw),
             Hint = raw[^4..],
-            Scopes = string.Join(',', scopes),
             ExpiresAt = request.ExpiresAt,
         };
         _db.ApiKeys.Add(entity);
         await _db.SaveChangesAsync(ct);
-        _logger.LogInformation("Создан API-ключ {Name} ({Id}) со scopes: {Scopes}", entity.Name, entity.Id, entity.Scopes);
+        _logger.LogInformation("Создан API-ключ {Name} ({Id})", entity.Name, entity.Id);
         return new CreatedApiKey { Key = ToDto(entity), PlaintextKey = raw };
     }
 
@@ -71,7 +68,6 @@ public sealed class ApiKeyService : IApiKeyService
         {
             Id = entity.Id,
             Name = entity.Name,
-            Scopes = SplitScopes(entity.Scopes),
         };
     }
 
@@ -86,7 +82,8 @@ public sealed class ApiKeyService : IApiKeyService
             Name = "bootstrap-admin",
             KeyHash = Hash(raw),
             Hint = raw.Length >= 4 ? raw[^4..] : raw,
-            Scopes = string.Join(',', Scopes.All),
+            // Маркер: при старте PlatformBootstrapper назначит роль «Администратор» и очистит поле.
+            Scopes = "admin",
         };
         _db.ApiKeys.Add(entity);
         await _db.SaveChangesAsync(ct);
@@ -110,24 +107,10 @@ public sealed class ApiKeyService : IApiKeyService
         return Convert.ToHexString(hash);
     }
 
-    private static List<string> NormalizeScopes(IEnumerable<string> requested)
-    {
-        var valid = requested
-            .Select(s => s.Trim())
-            .Where(Scopes.IsValid)
-            .Distinct()
-            .ToList();
-        return valid;
-    }
-
-    private static IReadOnlyList<string> SplitScopes(string scopes)
-        => scopes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
     private static ApiKeyDto ToDto(ApiKeyEntity e) => new()
     {
         Id = e.Id,
         Name = e.Name,
-        Scopes = SplitScopes(e.Scopes),
         CreatedAt = e.CreatedAt,
         ExpiresAt = e.ExpiresAt,
         LastUsedAt = e.LastUsedAt,

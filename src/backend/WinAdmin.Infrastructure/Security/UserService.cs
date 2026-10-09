@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using WinAdmin.Core.Abstractions;
 using WinAdmin.Core.Models;
-using WinAdmin.Core.Security;
 using WinAdmin.Infrastructure.Storage;
 
 namespace WinAdmin.Infrastructure.Security;
@@ -22,25 +21,11 @@ public sealed class UserService : IUserService
 
     public async Task<UserDto> CreateAsync(CreateUserRequest request, CancellationToken ct = default)
     {
-        var scopes = NormalizeScopes(request.Scopes);
-        var entity = new UserEntity
-        {
-            Login = request.Login.Trim(),
-            Scopes = string.Join(',', scopes),
-        };
+        var entity = new UserEntity { Login = request.Login.Trim() };
         entity.PasswordHash = _hasher.HashPassword(entity, request.Password);
         _db.Users.Add(entity);
         await _db.SaveChangesAsync(ct);
         return ToDto(entity);
-    }
-
-    public async Task<bool> UpdateScopesAsync(string id, IEnumerable<string> scopes, CancellationToken ct = default)
-    {
-        var entity = await _db.Users.FindAsync([id], ct);
-        if (entity is null) return false;
-        entity.Scopes = string.Join(',', NormalizeScopes(scopes));
-        await _db.SaveChangesAsync(ct);
-        return true;
     }
 
     public async Task<bool> ChangePasswordAsync(string id, string newPassword, CancellationToken ct = default)
@@ -82,14 +67,10 @@ public sealed class UserService : IUserService
     public Task<bool> AnyAsync(CancellationToken ct = default)
         => _db.Users.AnyAsync(ct);
 
-    private static List<string> NormalizeScopes(IEnumerable<string> scopes)
-        => scopes.Select(s => s.Trim()).Where(Scopes.IsValid).Distinct().ToList();
-
     private static UserDto ToDto(UserEntity e) => new()
     {
         Id = e.Id,
         Login = e.Login,
-        Scopes = e.Scopes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
         CreatedAt = e.CreatedAt,
         IsActive = e.IsActive,
     };
@@ -98,6 +79,5 @@ public sealed class UserService : IUserService
     {
         Id = e.Id,
         Login = e.Login,
-        Scopes = e.Scopes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
     };
 }

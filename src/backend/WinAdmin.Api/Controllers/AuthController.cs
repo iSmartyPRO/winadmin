@@ -82,7 +82,6 @@ public sealed class AuthController : ControllerBase
     public IActionResult Me() => Ok(new
     {
         login = User.Identity?.Name,
-        scopes = User.Claims.Where(c => c.Type == "scope").Select(c => c.Value).ToArray(),
     });
 
     private void SetRefreshCookie(string raw) =>

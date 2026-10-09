@@ -1,11 +1,11 @@
-﻿namespace WinAdmin.Core.Models;
+namespace WinAdmin.Core.Models;
 
 /// <summary>Представление API-ключа для UI (без секрета).</summary>
 public sealed record ApiKeyDto
 {
     public required string Id { get; init; }
     public required string Name { get; init; }
-    public IReadOnlyList<string> Scopes { get; init; } = [];
+    public IReadOnlyList<string> Roles { get; init; } = [];
     public DateTimeOffset CreatedAt { get; init; }
     public DateTimeOffset? ExpiresAt { get; init; }
     public DateTimeOffset? LastUsedAt { get; init; }
@@ -27,14 +27,13 @@ public sealed record ApiKeyPrincipal
 {
     public required string Id { get; init; }
     public required string Name { get; init; }
-    public IReadOnlyList<string> Scopes { get; init; } = [];
 }
 
 /// <summary>Запрос на создание ключа.</summary>
 public sealed record CreateApiKeyRequest
 {
     public required string Name { get; init; }
-    public List<string> Scopes { get; init; } = [];
+    public List<string> RoleIds { get; init; } = [];
     public DateTimeOffset? ExpiresAt { get; init; }
 }
 

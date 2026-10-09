@@ -1,13 +1,16 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WinAdmin.Core.Abstractions;
 using WinAdmin.Core.Models;
 using WinAdmin.Core.Security;
+using WinAdmin.Api.Auth;
+using WinAdmin.Api.Modules;
 
 namespace WinAdmin.Api.Controllers;
 
 /// <summary>Управление питанием: перезагрузка, выключение, отмена.</summary>
-[Authorize(Policy = "scope:" + Scopes.PowerManage)]
+[RequirePermission(PermissionIds.PowerManage)]
+[WinAdminModule("power")]
 public sealed class PowerController : WinAdminControllerBase
 {
     private readonly IPowerService _power;

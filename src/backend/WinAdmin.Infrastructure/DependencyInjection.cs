@@ -1,6 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
 using WinAdmin.Core.Abstractions;
 using WinAdmin.Core.Models;
+using WinAdmin.Infrastructure.Modules;
+using WinAdmin.Infrastructure.Access;
+using WinAdmin.Core.Modules;
 using WinAdmin.Infrastructure.Disks;
 using WinAdmin.Infrastructure.EventLogs;
 using WinAdmin.Infrastructure.Power;
@@ -45,6 +48,12 @@ public static class DependencyInjection
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<IExcludedUserService, ExcludedUserService>();
+
+        services.AddSingleton(new PermissionCatalog(BuiltInModules.All));
+        services.AddSingleton<IAccessService, AccessService>();
+        services.AddScoped<IRoleService, RoleService>();
+        services.AddSingleton<IMachineInfo, WmiMachineInfo>();
+        services.AddSingleton<IModuleRegistry, ModuleRegistry>();
 
         return services;
     }

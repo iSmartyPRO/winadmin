@@ -31,20 +31,21 @@ public sealed class TokenServiceTests : IDisposable
     public void Dispose() => _db.Dispose();
 
     [Fact]
-    public void GenerateAccessToken_ContainsLoginAndScopes()
+    public void GenerateAccessToken_ContainsLoginAndPrincipal()
     {
-        var principal = new UserPrincipal { Id = "1", Login = "admin", Scopes = ["admin"] };
+        var principal = new UserPrincipal { Id = "1", Login = "admin" };
         var token = _sut.GenerateAccessToken(principal);
         var handler = new JwtSecurityTokenHandler();
         var jwt = handler.ReadJwtToken(token);
         Assert.Equal("admin", jwt.Claims.First(c => c.Type == System.Security.Claims.ClaimTypes.Name).Value);
-        Assert.Contains(jwt.Claims, c => c.Type == "scope" && c.Value == "admin");
+        Assert.Contains(jwt.Claims, c => c.Type == "wa:principal" && c.Value == "LocalUser:1");
+        Assert.DoesNotContain(jwt.Claims, c => c.Type == "scope");
     }
 
     [Fact]
     public async Task CreateAndValidateRefreshToken_ReturnsPrincipal()
     {
-        var user = new UserEntity { Login = "alice", PasswordHash = "x", Scopes = "admin" };
+        var user = new UserEntity { Login = "alice", PasswordHash = "x" };
         _db.Users.Add(user);
         await _db.SaveChangesAsync();
 
@@ -58,7 +59,7 @@ public sealed class TokenServiceTests : IDisposable
     [Fact]
     public async Task RevokeRefreshToken_ValidateReturnsNull()
     {
-        var user = new UserEntity { Login = "bob", PasswordHash = "x", Scopes = "admin" };
+        var user = new UserEntity { Login = "bob", PasswordHash = "x" };
         _db.Users.Add(user);
         await _db.SaveChangesAsync();
 

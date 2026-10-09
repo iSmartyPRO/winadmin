@@ -4,7 +4,7 @@ public sealed record UserDto
 {
     public required string Id { get; init; }
     public required string Login { get; init; }
-    public IReadOnlyList<string> Scopes { get; init; } = [];
+    public IReadOnlyList<string> Roles { get; init; } = [];
     public DateTimeOffset CreatedAt { get; init; }
     public bool IsActive { get; init; }
 }
@@ -13,12 +13,7 @@ public sealed record CreateUserRequest
 {
     public required string Login { get; init; }
     public required string Password { get; init; }
-    public List<string> Scopes { get; init; } = [];
-}
-
-public sealed record UpdateScopesRequest
-{
-    public List<string> Scopes { get; init; } = [];
+    public List<string> RoleIds { get; init; } = [];
 }
 
 public sealed record ChangePasswordRequest
@@ -47,7 +42,6 @@ public sealed record UserPrincipal
 {
     public required string Id { get; init; }
     public required string Login { get; init; }
-    public IReadOnlyList<string> Scopes { get; init; } = [];
 }
 
 public sealed class JwtOptions

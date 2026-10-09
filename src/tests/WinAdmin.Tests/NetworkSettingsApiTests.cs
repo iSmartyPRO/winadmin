@@ -6,6 +6,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using WinAdmin.Core.Abstractions;
 using WinAdmin.Core.Models;
+using WinAdmin.Core.Modules;
+using WinAdmin.Core.Security;
 using WinAdmin.Infrastructure.Network;
 
 namespace WinAdmin.Tests;
@@ -37,13 +39,56 @@ public sealed class NetworkApiFactory : WebApplicationFactory<Program>
         });
     }
 
-    public async Task<HttpClient> ClientWithScopesAsync(params string[] scopes)
+    /// <summary>Клиент с API-ключом, которому назначена роль с перечисленными правами.</summary>
+    public async Task<HttpClient> ClientWithPermissionsAsync(params string[] permissions)
     {
         using var scope = Services.CreateScope();
         var keys = scope.ServiceProvider.GetRequiredService<IApiKeyService>();
-        var created = await keys.CreateAsync(new CreateApiKeyRequest { Name = "t-" + Guid.NewGuid().ToString("N"), Scopes = [.. scopes] });
+        var roles = scope.ServiceProvider.GetRequiredService<IRoleService>();
+        var created = await keys.CreateAsync(new CreateApiKeyRequest { Name = "t-" + Guid.NewGuid().ToString("N") });
+        var role = await roles.CreateAsync(new SaveRoleRequest("r-" + Guid.NewGuid().ToString("N"), null,
+            [.. permissions.Select(p => new RoleGrantDto(p, null))]), SystemActor());
+        await roles.AssignAsync(new CreateAssignmentRequest(role.Id, PrincipalType.ApiKey, created.Key.Id, null), SystemActor());
+        return WithKey(created.PlaintextKey);
+    }
+
+    public async Task<HttpClient> ClientAsAdministratorAsync()
+    {
+        using var scope = Services.CreateScope();
+        var keys = scope.ServiceProvider.GetRequiredService<IApiKeyService>();
+        var roles = scope.ServiceProvider.GetRequiredService<IRoleService>();
+        var created = await keys.CreateAsync(new CreateApiKeyRequest { Name = "adm-" + Guid.NewGuid().ToString("N") });
+        await roles.AssignAsync(new CreateAssignmentRequest(BuiltInRoles.AdministratorId, PrincipalType.ApiKey, created.Key.Id, null), SystemActor());
+        return WithKey(created.PlaintextKey);
+    }
+
+    /// <summary>Действующее лицо с полными правами (для подготовки данных в тестах).</summary>
+    public IAccessContext SystemActor()
+    {
+        var catalog = Services.GetRequiredService<PermissionCatalog>();
+        return new AccessContext(new PrincipalRef(PrincipalType.LocalUser, "test", []), "test",
+            PermissionEvaluator.Evaluate([new RoleSnapshot(BuiltInRoles.AdministratorId, true, [])], catalog));
+    }
+
+    /// <summary>JWT в формате до 1b: без claim wa:principal.</summary>
+    public string LegacyAccessToken(string userId)
+    {
+        var jwt = Services.GetRequiredService<JwtOptions>();
+        var key = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(jwt.Secret));
+        var token = new System.IdentityModel.Tokens.Jwt.JwtSecurityToken(
+            jwt.Issuer, jwt.Audience,
+            [new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.NameIdentifier, userId),
+             new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Name, "legacy"),
+             new System.Security.Claims.Claim("scope", "admin")],
+            expires: DateTime.UtcNow.AddMinutes(5),
+            signingCredentials: new Microsoft.IdentityModel.Tokens.SigningCredentials(key, Microsoft.IdentityModel.Tokens.SecurityAlgorithms.HmacSha256));
+        return new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    private HttpClient WithKey(string key)
+    {
         var client = CreateClient();
-        client.DefaultRequestHeaders.Add("X-API-Key", created.PlaintextKey);
+        client.DefaultRequestHeaders.Add("X-API-Key", key);
         return client;
     }
 
@@ -95,7 +140,7 @@ public sealed class NetworkSettingsApiTests(NetworkApiFactory factory)
     [Fact]
     public async Task Requires_admin_scope()
     {
-        var client = await factory.ClientWithScopesAsync("system.read");
+        var client = await factory.ClientWithPermissionsAsync(PermissionIds.SystemRead);
         var response = await client.GetAsync("/api/v1/settings/network");
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
@@ -104,7 +149,7 @@ public sealed class NetworkSettingsApiTests(NetworkApiFactory factory)
     public async Task Get_returns_settings_from_file_created_at_startup()
     {
         Assert.True(File.Exists(NetworkFile)); // создан при старте
-        var client = await factory.ClientWithScopesAsync("admin");
+        var client = await factory.ClientAsAdministratorAsync();
         var dto = await client.GetFromJsonAsync<NetworkSettingsDto>("/api/v1/settings/network", JsonOpts);
         var onDisk = new NetworkSettingsStore(factory.DataDir).ReadOrDefault(out _);
 
@@ -118,7 +163,7 @@ public sealed class NetworkSettingsApiTests(NetworkApiFactory factory)
     [Fact]
     public async Task Invalid_settings_return_400_and_do_not_touch_file()
     {
-        var client = await factory.ClientWithScopesAsync("admin");
+        var client = await factory.ClientAsAdministratorAsync();
         string before = File.ReadAllText(NetworkFile);
         var response = await client.PutAsJsonAsync("/api/v1/settings/network",
             new { mode = "Network", port = 9090, allow = Array.Empty<string>() });
@@ -130,7 +175,7 @@ public sealed class NetworkSettingsApiTests(NetworkApiFactory factory)
     public async Task Busy_port_returns_409()
     {
         factory.BusyPorts.Add(9555);
-        var client = await factory.ClientWithScopesAsync("admin");
+        var client = await factory.ClientAsAdministratorAsync();
         var response = await client.PutAsJsonAsync("/api/v1/settings/network",
             new { mode = "Local", port = 9555, allow = Array.Empty<string>() });
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
@@ -139,7 +184,7 @@ public sealed class NetworkSettingsApiTests(NetworkApiFactory factory)
     [Fact]
     public async Task Valid_settings_return_url_then_write_file_and_audit()
     {
-        var client = await factory.ClientWithScopesAsync("admin");
+        var client = await factory.ClientAsAdministratorAsync();
         int port = 9000 + Random.Shared.Next(500);
         var response = await client.PutAsJsonAsync("/api/v1/settings/network",
             new { mode = "Network", port, allow = new[] { "10.77.77.0/24" } });

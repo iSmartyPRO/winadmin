@@ -1,13 +1,14 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WinAdmin.Core.Abstractions;
 using WinAdmin.Core.Models;
 using WinAdmin.Core.Security;
+using WinAdmin.Api.Auth;
 
 namespace WinAdmin.Api.Controllers;
 
 /// <summary>Журнал аудита управляющих действий (требует scope admin).</summary>
-[Authorize(Policy = "scope:" + Scopes.Admin)]
+[RequirePermission(PermissionIds.PlatformAuditRead)]
 public sealed class AuditController : WinAdminControllerBase
 {
     private readonly IAuditService _audit;

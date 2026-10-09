@@ -4,10 +4,13 @@ using WinAdmin.Core.Abstractions;
 using WinAdmin.Core.Models;
 using WinAdmin.Core.Security;
 using WinAdmin.Infrastructure.EventLogs;
+using WinAdmin.Api.Auth;
+using WinAdmin.Api.Modules;
 
 namespace WinAdmin.Api.Controllers;
 
 /// <summary>Просмотр и фильтрация журналов событий Windows.</summary>
+[WinAdminModule("eventlogs")]
 public sealed class EventLogsController : WinAdminControllerBase
 {
     private readonly IEventLogService _eventLogs;
@@ -21,13 +24,13 @@ public sealed class EventLogsController : WinAdminControllerBase
 
     /// <summary>Список всех журналов событий, доступных на этой машине.</summary>
     [HttpGet("lognames")]
-    [Authorize(Policy = "scope:" + Scopes.EventLogsRead)]
+    [RequirePermission(PermissionIds.EventLogsRead)]
     [ProducesResponseType(typeof(IReadOnlyList<string>), StatusCodes.Status200OK)]
     public ActionResult<IReadOnlyList<string>> GetLogNames() => Ok(_eventLogs.GetLogNames());
 
     /// <summary>Запрос записей журнала с фильтрами по времени, Event ID, уровню, тексту и учётной записи.</summary>
     [HttpGet("query")]
-    [Authorize(Policy = "scope:" + Scopes.EventLogsRead)]
+    [RequirePermission(PermissionIds.EventLogsRead)]
     [ProducesResponseType(typeof(EventLogQueryResult), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]

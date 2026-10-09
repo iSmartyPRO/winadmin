@@ -11,7 +11,6 @@ public static class UserCommands
         userCommand.AddCommand(ListCommand(provider));
         userCommand.AddCommand(AddCommand(provider));
         userCommand.AddCommand(PasswordCommand(provider));
-        userCommand.AddCommand(ScopesCommand(provider));
         userCommand.AddCommand(DeactivateCommand(provider));
         userCommand.AddCommand(ActivateCommand(provider));
         userCommand.AddCommand(DeleteCommand(provider));
@@ -32,11 +31,11 @@ public static class UserCommands
                 Console.WriteLine("Пользователи не найдены.");
                 return;
             }
-            Console.WriteLine($"{"LOGIN",-20} {"SCOPES",-40} {"CREATED",-12} ACTIVE");
+            Console.WriteLine($"{"LOGIN",-20} {"CREATED",-12} ACTIVE");
             Console.WriteLine(new string('─', 80));
             foreach (var u in users)
             {
-                Console.WriteLine($"{u.Login,-20} {string.Join(',', u.Scopes),-40} {u.CreatedAt.ToString("yyyy-MM-dd"),-12} {(u.IsActive ? "yes" : "no")}");
+                Console.WriteLine($"{u.Login,-20} {u.CreatedAt.ToString("yyyy-MM-dd"),-12} {(u.IsActive ? "yes" : "no")}");
             }
         });
         return cmd;
@@ -51,14 +50,12 @@ public static class UserCommands
         var cmd = new Command("add", "Создать пользователя") { loginOpt, passwordOpt, scopesOpt };
         cmd.SetHandler(async (login, password, scopesRaw) =>
         {
-            var scopes = scopesRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
             var dto = await GetService(provider).CreateAsync(new CreateUserRequest
             {
                 Login = login,
                 Password = password,
-                Scopes = scopes,
             });
-            Console.WriteLine($"Создан пользователь: {dto.Login} (scopes: {string.Join(',', dto.Scopes)})");
+            Console.WriteLine($"Создан пользователь: {dto.Login}");
         }, loginOpt, passwordOpt, scopesOpt);
         return cmd;
     }
@@ -77,24 +74,6 @@ public static class UserCommands
             await GetService(provider).ChangePasswordAsync(user.Id, password);
             Console.WriteLine($"Пароль пользователя '{login}' изменён.");
         }, loginArg, passwordArg);
-        return cmd;
-    }
-
-    // ── scopes ───────────────────────────────────────────────────
-    private static Command ScopesCommand(IServiceProvider provider)
-    {
-        var loginArg = new Argument<string>("login", "Логин пользователя");
-        var scopesArg = new Argument<string>("scopes", "Scopes через запятую");
-        var cmd = new Command("scopes", "Изменить scopes") { loginArg, scopesArg };
-        cmd.SetHandler(async (login, scopesRaw) =>
-        {
-            var scopes = scopesRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            var users = await GetService(provider).ListAsync();
-            var user = users.FirstOrDefault(u => u.Login == login);
-            if (user is null) { Console.Error.WriteLine($"Пользователь '{login}' не найден."); return; }
-            await GetService(provider).UpdateScopesAsync(user.Id, scopes);
-            Console.WriteLine($"Scopes пользователя '{login}' обновлены.");
-        }, loginArg, scopesArg);
         return cmd;
     }
 

@@ -1,8 +1,9 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 using WinAdmin.Core.Abstractions;
+using WinAdmin.Core.Security;
 
 namespace WinAdmin.Api.Auth;
 
@@ -10,9 +11,6 @@ public static class ApiKeyDefaults
 {
     public const string Scheme = "ApiKey";
     public const string HeaderName = "X-API-Key";
-
-    /// <summary>Тип claim для каждого scope ключа.</summary>
-    public const string ScopeClaimType = "scope";
 }
 
 /// <summary>
@@ -49,7 +47,7 @@ public sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<Authenti
             new(ClaimTypes.NameIdentifier, principal.Id),
             new(ClaimTypes.Name, principal.Name),
         };
-        claims.AddRange(principal.Scopes.Select(s => new Claim(ApiKeyDefaults.ScopeClaimType, s)));
+        claims.Add(new Claim(PrincipalClaims.Type, PrincipalClaims.Format(PrincipalType.ApiKey, principal.Id)));
 
         var identity = new ClaimsIdentity(claims, ApiKeyDefaults.Scheme);
         var ticket = new AuthenticationTicket(new ClaimsPrincipal(identity), ApiKeyDefaults.Scheme);

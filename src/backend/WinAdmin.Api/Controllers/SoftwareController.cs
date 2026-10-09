@@ -3,9 +3,12 @@ using Microsoft.AspNetCore.Mvc;
 using WinAdmin.Core.Abstractions;
 using WinAdmin.Core.Models;
 using WinAdmin.Core.Security;
+using WinAdmin.Api.Auth;
+using WinAdmin.Api.Modules;
 
 namespace WinAdmin.Api.Controllers;
 
+[WinAdminModule("software")]
 public sealed class SoftwareController : WinAdminControllerBase
 {
     private readonly ISoftwareCatalogService _catalog;
@@ -18,37 +21,37 @@ public sealed class SoftwareController : WinAdminControllerBase
     }
 
     [HttpGet("applications")]
-    [Authorize(Policy = "scope:" + Scopes.SoftwareRead)]
+    [RequirePermission(PermissionIds.SoftwareRead)]
     [ProducesResponseType(typeof(IReadOnlyList<InstalledApp>), StatusCodes.Status200OK)]
     public ActionResult<IReadOnlyList<InstalledApp>> GetApplications()
         => Ok(_catalog.GetApplications());
 
     [HttpPost("applications/{id}/uninstall")]
-    [Authorize(Policy = "scope:" + Scopes.SoftwareManage)]
+    [RequirePermission(PermissionIds.SoftwareManage)]
     [ProducesResponseType(typeof(SoftwareJob), StatusCodes.Status202Accepted)]
     public IActionResult UninstallApplication(string id)
         => StartJob(() => _jobs.StartUninstallApp(Uri.UnescapeDataString(id)));
 
     [HttpGet("updates")]
-    [Authorize(Policy = "scope:" + Scopes.SoftwareRead)]
+    [RequirePermission(PermissionIds.SoftwareRead)]
     [ProducesResponseType(typeof(IReadOnlyList<InstalledUpdate>), StatusCodes.Status200OK)]
     public ActionResult<IReadOnlyList<InstalledUpdate>> GetUpdates()
         => Ok(_catalog.GetUpdates());
 
     [HttpPost("updates/{id}/uninstall")]
-    [Authorize(Policy = "scope:" + Scopes.SoftwareManage)]
+    [RequirePermission(PermissionIds.SoftwareManage)]
     [ProducesResponseType(typeof(SoftwareJob), StatusCodes.Status202Accepted)]
     public IActionResult UninstallUpdate(string id)
         => StartJob(() => _jobs.StartUninstallUpdate(Uri.UnescapeDataString(id)));
 
     [HttpPost("updates/{id}/rollback")]
-    [Authorize(Policy = "scope:" + Scopes.SoftwareManage)]
+    [RequirePermission(PermissionIds.SoftwareManage)]
     [ProducesResponseType(typeof(SoftwareJob), StatusCodes.Status202Accepted)]
     public IActionResult RollbackUpdate(string id)
         => StartJob(() => _jobs.StartRollbackUpdate(Uri.UnescapeDataString(id)));
 
     [HttpGet("jobs/active")]
-    [Authorize(Policy = "scope:" + Scopes.SoftwareManage)]
+    [RequirePermission(PermissionIds.SoftwareManage)]
     [ProducesResponseType(typeof(SoftwareJob), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public IActionResult GetActiveJob()
@@ -58,7 +61,7 @@ public sealed class SoftwareController : WinAdminControllerBase
     }
 
     [HttpGet("jobs/{jobId}")]
-    [Authorize(Policy = "scope:" + Scopes.SoftwareManage)]
+    [RequirePermission(PermissionIds.SoftwareManage)]
     [ProducesResponseType(typeof(SoftwareJob), StatusCodes.Status200OK)]
     public ActionResult<SoftwareJob> GetJob(string jobId)
     {

@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using WinAdmin.Core.Abstractions;
 using WinAdmin.Core.Models;
+using WinAdmin.Core.Security;
 using WinAdmin.Infrastructure.Storage;
 
 namespace WinAdmin.Infrastructure.Security;
@@ -30,7 +31,7 @@ public sealed class TokenService : ITokenService
             new(ClaimTypes.NameIdentifier, user.Id),
             new(ClaimTypes.Name, user.Login),
         };
-        claims.AddRange(user.Scopes.Select(s => new Claim("scope", s)));
+        claims.Add(new Claim(PrincipalClaims.Type, PrincipalClaims.Format(PrincipalType.LocalUser, user.Id)));
 
         var token = new JwtSecurityToken(
             issuer: _opts.Issuer,
@@ -71,7 +72,6 @@ public sealed class TokenService : ITokenService
         {
             Id = entity.User.Id,
             Login = entity.User.Login,
-            Scopes = entity.User.Scopes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
         };
     }
 

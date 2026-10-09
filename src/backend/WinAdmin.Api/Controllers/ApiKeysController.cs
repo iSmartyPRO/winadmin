@@ -1,13 +1,14 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WinAdmin.Core.Abstractions;
 using WinAdmin.Core.Models;
 using WinAdmin.Core.Security;
+using WinAdmin.Api.Auth;
 
 namespace WinAdmin.Api.Controllers;
 
 /// <summary>Управление API-ключами (требует scope admin).</summary>
-[Authorize(Policy = "scope:" + Scopes.Admin)]
+[RequirePermission(PermissionIds.PlatformApiKeysManage)]
 [Route("api/v1/apikeys")]
 public sealed class ApiKeysController : WinAdminControllerBase
 {
@@ -26,11 +27,6 @@ public sealed class ApiKeysController : WinAdminControllerBase
     public async Task<ActionResult<IReadOnlyList<ApiKeyDto>>> List(CancellationToken ct)
         => Ok(await _keys.ListAsync(ct));
 
-    /// <summary>Доступные scopes для назначения.</summary>
-    [HttpGet("scopes")]
-    [ProducesResponseType(typeof(IReadOnlyList<string>), StatusCodes.Status200OK)]
-    public ActionResult<IReadOnlyList<string>> AvailableScopes() => Ok(Scopes.All);
-
     /// <summary>Создать ключ. Секрет возвращается один раз.</summary>
     [HttpPost]
     [ProducesResponseType(typeof(CreatedApiKey), StatusCodes.Status201Created)]
@@ -43,7 +39,7 @@ public sealed class ApiKeysController : WinAdminControllerBase
         await _audit.WriteAsync(new AuditEntryDto
         {
             Actor = Actor, Action = "apikey.create", Target = created.Key.Id,
-            Success = true, Details = $"scopes: {string.Join(',', created.Key.Scopes)}", SourceIp = SourceIp,
+            Success = true, Details = null, SourceIp = SourceIp,
         }, ct);
         return StatusCode(StatusCodes.Status201Created, created);
     }
