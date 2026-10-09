@@ -28,11 +28,11 @@ public sealed class PrintersController : WinAdminControllerBase
     public ActionResult<IReadOnlyList<PrinterInfo>> Get() => Ok(_printers.GetPrinters());
 
     /// <summary>Управление принтером: pause, resume или purge (очистить очередь).</summary>
-    [HttpPost("{name}/{action}")]
+    [HttpPost("{name}/{operation}")]
     [RequirePermission(PermissionIds.PrintersManage)]
     [ProducesResponseType(typeof(OperationResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(OperationResult), StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> Control(string name, string action)
+    public async Task<IActionResult> Control(string name, [FromRoute(Name = "operation")] string action)
     {
         if (!Enum.TryParse<PrinterAction>(action, ignoreCase: true, out var parsed))
             return BadRequest(OperationResult.Fail($"Неизвестное действие '{action}'. Допустимо: pause, resume, purge"));

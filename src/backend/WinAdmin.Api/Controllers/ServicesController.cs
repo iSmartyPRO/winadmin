@@ -28,11 +28,11 @@ public sealed class ServicesController : WinAdminControllerBase
     public ActionResult<IReadOnlyList<ServiceInfo>> Get() => Ok(_services.GetServices());
 
     /// <summary>Управление службой: start, stop или restart.</summary>
-    [HttpPost("{name}/{action}")]
+    [HttpPost("{name}/{operation}")]
     [RequirePermission(PermissionIds.ServicesManage)]
     [ProducesResponseType(typeof(OperationResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(OperationResult), StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> Control(string name, string action)
+    public async Task<IActionResult> Control(string name, [FromRoute(Name = "operation")] string action)
     {
         if (!Enum.TryParse<ServiceAction>(action, ignoreCase: true, out var parsed))
             return BadRequest(OperationResult.Fail($"Неизвестное действие '{action}'. Допустимо: start, stop, restart"));
