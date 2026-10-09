@@ -1,3 +1,4 @@
+using WinAdmin.Core.ActiveDirectory;
 using WinAdmin.Core.Models;
 
 namespace WinAdmin.Core.Abstractions;
@@ -13,6 +14,14 @@ public interface ITokenService
     /// <summary>Проверяет raw refresh token. Возвращает UserPrincipal или null.</summary>
     Task<UserPrincipal?> ValidateRefreshTokenAsync(string rawToken, CancellationToken ct = default);
 
-    /// <summary>Отзывает refresh token (logout).</summary>
+    /// <summary>JWT для пользователя AD: sub = SID, wa:principal = AdUser:SID; группы не кладутся.</summary>
+    string GenerateDirectoryAccessToken(DirectoryObject account);
+
+    Task<string> CreateDirectoryRefreshTokenAsync(string sid, CancellationToken ct = default);
+
+    /// <summary>SID владельца действующего refresh-токена AD или null.</summary>
+    Task<string?> ValidateDirectoryRefreshTokenAsync(string rawToken, CancellationToken ct = default);
+
+    /// <summary>Отзывает refresh token (logout) — локальный или AD.</summary>
     Task RevokeRefreshTokenAsync(string rawToken, CancellationToken ct = default);
 }

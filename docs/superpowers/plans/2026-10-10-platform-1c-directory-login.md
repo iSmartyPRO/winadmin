@@ -1187,6 +1187,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using WinAdmin.Core.Abstractions;
 using WinAdmin.Core.ActiveDirectory;
+using WinAdmin.Core.Models;
 using WinAdmin.Core.Modules;
 using WinAdmin.Core.Security;
 using WinAdmin.Infrastructure.Access;
