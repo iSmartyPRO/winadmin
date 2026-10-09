@@ -137,6 +137,7 @@ builder.Services
                 : ApiKeyDefaults.Scheme;
     })
     .AddScheme<AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(ApiKeyDefaults.Scheme, _ => { })
+    .AddNegotiate()
     .AddJwtBearer(options =>
     {
         options.TokenValidationParameters = new TokenValidationParameters
@@ -162,6 +163,7 @@ builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProv
 builder.Services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
 builder.Services.AddSingleton<AccessContextFactory>();
 builder.Services.AddSingleton<LoginThrottle>();
+builder.Services.AddSingleton<IWindowsSignInReader, NegotiateWindowsSignInReader>();
 
 builder.Services.AddRateLimiter(options =>
 {

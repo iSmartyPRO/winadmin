@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Negotiate;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -8,6 +10,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Moq;
+using WinAdmin.Api.Auth;
 using WinAdmin.Core.Abstractions;
 using WinAdmin.Core.ActiveDirectory;
 using WinAdmin.Core.Models;
@@ -25,6 +28,7 @@ public sealed class NetworkApiFactory : WebApplicationFactory<Program>
     public FakeFirewall Firewall { get; } = new();
     public HashSet<int> BusyPorts { get; } = [];
     public FakeDirectory Directory { get; } = new();
+    public FakeWindowsReader Windows { get; } = new();
     public DirectorySettings DirectorySettings { get; set; } = new(true, "test.local", null, null, false);
 
     /// <summary>Клиент, чьи запросы сервер видит пришедшими с указанного адреса (только в тестах).</summary>
@@ -64,6 +68,11 @@ public sealed class NetworkApiFactory : WebApplicationFactory<Program>
                 .Callback<DirectorySettings, CancellationToken>((s, _) => DirectorySettings = s).Returns(Task.CompletedTask);
             services.AddSingleton(settings.Object);
             services.AddSingleton<IStartupFilter, TestRemoteIp>();
+            services.RemoveAll<IWindowsSignInReader>();
+            services.AddSingleton<IWindowsSignInReader>(Windows);
+            // Настоящий NegotiateHandler требует Kestrel (IConnectionItemsFeature) и падает в TestServer.
+            services.PostConfigure<AuthenticationOptions>(o =>
+                o.SchemeMap[NegotiateDefaults.AuthenticationScheme].HandlerType = typeof(ChallengeOnlyHandler));
         });
     }
 
@@ -140,6 +149,22 @@ public sealed class NetworkApiFactory : WebApplicationFactory<Program>
         public bool IsInUse(int port) => busy.Contains(port);
         public bool IsListening(NetworkSettings settings) => true;
     }
+}
+
+/// <summary>Схема Negotiate в тестах: ничего не аутентифицирует, на вызов отвечает 401.</summary>
+public sealed class ChallengeOnlyHandler(
+    Microsoft.Extensions.Options.IOptionsMonitor<AuthenticationSchemeOptions> options,
+    Microsoft.Extensions.Logging.ILoggerFactory logger, System.Text.Encodings.Web.UrlEncoder encoder)
+    : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
+{
+    protected override Task<AuthenticateResult> HandleAuthenticateAsync() => Task.FromResult(AuthenticateResult.NoResult());
+}
+
+/// <summary>Результат Negotiate в тестах: Next == null — нет учётки Windows (будет вызов).</summary>
+public sealed class FakeWindowsReader : IWindowsSignInReader
+{
+    public WindowsSignIn? Next { get; set; }
+    public Task<WindowsSignIn?> ReadAsync(HttpContext context) => Task.FromResult(Next);
 }
 
 /// <summary>Тестовый адрес клиента: TestServer не заполняет RemoteIpAddress.</summary>

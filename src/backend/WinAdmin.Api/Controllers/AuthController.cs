@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication.Negotiate;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WinAdmin.Api.Auth;
@@ -11,7 +12,8 @@ namespace WinAdmin.Api.Controllers;
 [Produces("application/json")]
 public sealed class AuthController(
     IUserService users, ITokenService tokens, IDirectorySignIn directory,
-    IDirectorySettingsStore directorySettings, IAuditService audit, LoginThrottle throttle) : ControllerBase
+    IDirectorySettingsStore directorySettings, IAuditService audit, LoginThrottle throttle,
+    IWindowsSignInReader windows) : ControllerBase
 {
     private const string RefreshCookie = "wa_refresh";
 
@@ -92,6 +94,37 @@ public sealed class AuthController(
 
         ClearRefreshCookie();
         return Unauthorized(new { message = "Refresh token недействителен или истёк" });
+    }
+
+    /// <summary>Есть ли вход учёткой домена (для кнопки «Войти как текущий пользователь Windows»).</summary>
+    [HttpGet("options")]
+    [AllowAnonymous]
+    public async Task<IActionResult> Options(CancellationToken ct)
+        => Ok(new { directory = (await directorySettings.GetAsync(ct)).Enabled });
+
+    /// <summary>SSO: Negotiate (Kerberos). NTLM не принимается. Работает по HTTP и HTTPS.</summary>
+    [HttpGet("windows")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(TokenResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Windows(CancellationToken ct)
+    {
+        if (!(await directorySettings.GetAsync(ct)).Enabled)
+            return NotFound(new { message = "Вход учёткой домена выключен" });
+
+        var identity = await windows.ReadAsync(HttpContext);
+        if (identity is null)
+            return Challenge(NegotiateDefaults.AuthenticationScheme);
+        if (!string.Equals(identity.AuthenticationType, "Kerberos", StringComparison.OrdinalIgnoreCase))
+        {
+            await AuditAsync("auth.windows.failed", identity.Sid, false, identity.AuthenticationType, ct);
+            return Unauthorized(new { message = "Нужен вход Kerberos (NTLM не принимается): откройте WinAdmin по имени сервера в домене" });
+        }
+
+        var result = await directory.CompleteAsync(identity.Sid, ct);
+        return await DirectoryOutcomeAsync(result, identity.Sid, "auth.windows", ct);
     }
 
     /// <summary>Выход — отзывает refresh token.</summary>
