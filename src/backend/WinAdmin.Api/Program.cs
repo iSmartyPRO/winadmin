@@ -84,6 +84,7 @@ builder.Services.AddControllers()
     });
 builder.Services.AddWinAdminInfrastructure(connectionString, jwtOptions);
 builder.Services.AddWinAdminNetwork(networkStore);
+builder.Services.AddSingleton<NetworkApplyWatchdog>();
 
 builder.Services
     .AddAuthentication(options =>
