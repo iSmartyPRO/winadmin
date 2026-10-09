@@ -45,7 +45,7 @@
 | `src/backend/WinAdmin.Core/ActiveDirectory/AdWriteException.cs` | Ошибка записи с кодом LDAP |
 | `src/backend/WinAdmin.Core/Operations/ScenarioRunner.cs` | Пошаговые сценарии |
 | `src/backend/WinAdmin.Core/Security/PasswordGenerator.cs` | Генератор паролей |
-| `src/backend/WinAdmin.Core/Environment/EnvironmentChecks.cs` | `IEnvironmentCheck`, `CheckResult`, `CheckStatus`, `CheckDepth`, `EnvironmentReport` |
+| `src/backend/WinAdmin.Core/EnvironmentChecks/EnvironmentChecks.cs` | `IEnvironmentCheck`, `CheckResult`, `CheckStatus`, `CheckDepth`, `EnvironmentReport` |
 | `src/backend/WinAdmin.Core/Abstractions/IAdServices.cs` | `IAdStructureStore`, `IAdReader`, `IAdWriter`, `IEnvironmentService` |
 | `src/backend/WinAdmin.Infrastructure/ActiveDirectory/LdapConnections.cs` | Подключение, корень каталога, поиск с лимитом и постранично |
 | `src/backend/WinAdmin.Infrastructure/ActiveDirectory/AdStructureStore.cs` | Настройки в `PlatformSettings` (ключ `ad-structure`), шифрование пароля |
@@ -53,9 +53,9 @@
 | `src/backend/WinAdmin.Infrastructure/ActiveDirectory/LdapAdReader.cs` | Проекты, существование, эффективные права, статус учётки записи |
 | `src/backend/WinAdmin.Infrastructure/ActiveDirectory/AdWriteRequests.cs` | Чистые построители значений LDAP и перевод ошибок |
 | `src/backend/WinAdmin.Infrastructure/ActiveDirectory/LdapAdWriter.cs` | Запись в AD |
-| `src/backend/WinAdmin.Infrastructure/Environment/EnvironmentService.cs` | Запуск проверок, последние результаты, аудит смены статуса |
-| `src/backend/WinAdmin.Infrastructure/Environment/EnvironmentMonitor.cs` | Фон: `Quick` раз в час |
-| `src/backend/WinAdmin.Infrastructure/Environment/PlatformAdCheck.cs` | `ad.directory`, `ad.root`, `ad.writer`, `ad.channel` |
+| `src/backend/WinAdmin.Infrastructure/EnvironmentChecks/EnvironmentService.cs` | Запуск проверок, последние результаты, аудит смены статуса |
+| `src/backend/WinAdmin.Infrastructure/EnvironmentChecks/EnvironmentMonitor.cs` | Фон: `Quick` раз в час |
+| `src/backend/WinAdmin.Infrastructure/EnvironmentChecks/PlatformAdCheck.cs` | `ad.directory`, `ad.root`, `ad.writer`, `ad.channel` |
 | `src/backend/WinAdmin.Api/Controllers/AdStructureController.cs` | `GET/PUT /api/v1/settings/ad` |
 | `src/backend/WinAdmin.Api/Controllers/EnvironmentController.cs` | `GET /api/v1/environment`, `/environment/latest` |
 | `src/frontend/src/components/AdStructureCard.tsx` | Карточка «Active Directory: управление» |
@@ -811,7 +811,7 @@ Expected: FAIL — компиляция: нет `AdStructureStore`.
 ```csharp
 // src/backend/WinAdmin.Core/Abstractions/IAdServices.cs
 using WinAdmin.Core.ActiveDirectory;
-using WinAdmin.Core.Environment;
+using WinAdmin.Core.EnvironmentChecks;
 
 namespace WinAdmin.Core.Abstractions;
 
@@ -863,7 +863,7 @@ public interface IEnvironmentService
 }
 ```
 
-(`WinAdmin.Core.Environment` создаётся в Task 6; чтобы этот файл компилировался сейчас, в Task 3 создать `src/backend/WinAdmin.Core/Environment/EnvironmentChecks.cs` целиком — код в Task 6, Step 3 — и тесты Task 6 добавить в Task 6.)
+(`WinAdmin.Core.EnvironmentChecks` создаётся в Task 6; чтобы этот файл компилировался сейчас, в Task 3 создать `src/backend/WinAdmin.Core/EnvironmentChecks/EnvironmentChecks.cs` целиком — код в Task 6, Step 3 — и тесты Task 6 добавить в Task 6.)
 
 ```csharp
 // src/backend/WinAdmin.Infrastructure/ActiveDirectory/AdStructureStore.cs
@@ -1722,9 +1722,9 @@ git commit -m "feat(ad): LDAP writer over encrypted channel with translated erro
 ### Task 6: Механизм проверки окружения
 
 **Files:**
-- Create: `src/backend/WinAdmin.Core/Environment/EnvironmentChecks.cs`
-- Create: `src/backend/WinAdmin.Infrastructure/Environment/EnvironmentService.cs`
-- Create: `src/backend/WinAdmin.Infrastructure/Environment/EnvironmentMonitor.cs`
+- Create: `src/backend/WinAdmin.Core/EnvironmentChecks/EnvironmentChecks.cs`
+- Create: `src/backend/WinAdmin.Infrastructure/EnvironmentChecks/EnvironmentService.cs`
+- Create: `src/backend/WinAdmin.Infrastructure/EnvironmentChecks/EnvironmentMonitor.cs`
 - Modify: `src/backend/WinAdmin.Core/Security/PermissionIds.cs` (+ `PlatformEnvironmentCheck`)
 - Modify: `src/backend/WinAdmin.Infrastructure/DependencyInjection.cs`, `src/backend/WinAdmin.Api/Program.cs`
 - Test: `src/tests/WinAdmin.Tests/EnvironmentServiceTests.cs`
@@ -1746,9 +1746,9 @@ git commit -m "feat(ad): LDAP writer over encrypted channel with translated erro
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using WinAdmin.Core.Abstractions;
-using WinAdmin.Core.Environment;
+using WinAdmin.Core.EnvironmentChecks;
 using WinAdmin.Core.Models;
-using WinAdmin.Infrastructure.Environment;
+using WinAdmin.Infrastructure.EnvironmentChecks;
 
 namespace WinAdmin.Tests;
 
@@ -1842,8 +1842,8 @@ Expected: FAIL — компиляция: нет `EnvironmentService` (а `Enviro
 - [ ] **Step 3: Write minimal implementation**
 
 ```csharp
-// src/backend/WinAdmin.Core/Environment/EnvironmentChecks.cs
-namespace WinAdmin.Core.Environment;
+// src/backend/WinAdmin.Core/EnvironmentChecks/EnvironmentChecks.cs
+namespace WinAdmin.Core.EnvironmentChecks;
 
 public enum CheckStatus { Ok, Warning, Failed, Skipped }
 
@@ -1878,14 +1878,14 @@ public sealed record EnvironmentReport(string ModuleId, DateTimeOffset At, Check
 ```
 
 ```csharp
-// src/backend/WinAdmin.Infrastructure/Environment/EnvironmentService.cs
+// src/backend/WinAdmin.Infrastructure/EnvironmentChecks/EnvironmentService.cs
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using WinAdmin.Core.Abstractions;
-using WinAdmin.Core.Environment;
+using WinAdmin.Core.EnvironmentChecks;
 using WinAdmin.Core.Models;
 
-namespace WinAdmin.Infrastructure.Environment;
+namespace WinAdmin.Infrastructure.EnvironmentChecks;
 
 /// <summary>Запуск проверок окружения: «platform» — всегда, модули — если включены (или запрошены явно).</summary>
 public sealed class EnvironmentService(
@@ -1950,13 +1950,13 @@ public sealed class EnvironmentService(
 ```
 
 ```csharp
-// src/backend/WinAdmin.Infrastructure/Environment/EnvironmentMonitor.cs
+// src/backend/WinAdmin.Infrastructure/EnvironmentChecks/EnvironmentMonitor.cs
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using WinAdmin.Core.Abstractions;
-using WinAdmin.Core.Environment;
+using WinAdmin.Core.EnvironmentChecks;
 
-namespace WinAdmin.Infrastructure.Environment;
+namespace WinAdmin.Infrastructure.EnvironmentChecks;
 
 /// <summary>Фон: быстрые проверки через минуту после старта и далее раз в час.</summary>
 public sealed class EnvironmentMonitor(IEnvironmentService environment, ILogger<EnvironmentMonitor> logger) : BackgroundService
@@ -2021,7 +2021,7 @@ git commit -m "feat(environment): environment check service, hourly monitor, per
 ### Task 7: Платформенные проверки AD
 
 **Files:**
-- Create: `src/backend/WinAdmin.Infrastructure/Environment/PlatformAdCheck.cs`
+- Create: `src/backend/WinAdmin.Infrastructure/EnvironmentChecks/PlatformAdCheck.cs`
 - Create: `src/tests/WinAdmin.Tests/Fakes/FakeAdReader.cs`
 - Modify: `src/backend/WinAdmin.Infrastructure/DependencyInjection.cs`
 - Test: `src/tests/WinAdmin.Tests/PlatformAdCheckTests.cs`
@@ -2080,8 +2080,8 @@ public sealed class FakeAdReader : IAdReader
 using Moq;
 using WinAdmin.Core.Abstractions;
 using WinAdmin.Core.ActiveDirectory;
-using WinAdmin.Core.Environment;
-using WinAdmin.Infrastructure.Environment;
+using WinAdmin.Core.EnvironmentChecks;
+using WinAdmin.Infrastructure.EnvironmentChecks;
 using WinAdmin.Tests.Fakes;
 
 namespace WinAdmin.Tests;
@@ -2201,12 +2201,12 @@ Expected: FAIL — компиляция: нет `PlatformAdCheck`.
 - [ ] **Step 3: Write minimal implementation**
 
 ```csharp
-// src/backend/WinAdmin.Infrastructure/Environment/PlatformAdCheck.cs
+// src/backend/WinAdmin.Infrastructure/EnvironmentChecks/PlatformAdCheck.cs
 using WinAdmin.Core.Abstractions;
 using WinAdmin.Core.ActiveDirectory;
-using WinAdmin.Core.Environment;
+using WinAdmin.Core.EnvironmentChecks;
 
-namespace WinAdmin.Infrastructure.Environment;
+namespace WinAdmin.Infrastructure.EnvironmentChecks;
 
 /// <summary>Готовность общего слоя AD: домен, корневая OU, учётка записи, шифрование канала.</summary>
 public sealed class PlatformAdCheck(
@@ -2358,7 +2358,7 @@ git commit -m "feat(environment): platform AD checks (domain, root OU, write acc
 ```csharp
             services.RemoveAll<IAdReader>();
             services.AddSingleton<IAdReader>(AdReader);
-            var monitor = services.SingleOrDefault(d => d.ImplementationType == typeof(WinAdmin.Infrastructure.Environment.EnvironmentMonitor));
+            var monitor = services.SingleOrDefault(d => d.ImplementationType == typeof(WinAdmin.Infrastructure.EnvironmentChecks.EnvironmentMonitor));
             if (monitor is not null) services.Remove(monitor);
 ```
 
@@ -2483,7 +2483,7 @@ public sealed class AdStructureController(IAdStructureStore store, IAuditService
 using Microsoft.AspNetCore.Mvc;
 using WinAdmin.Api.Auth;
 using WinAdmin.Core.Abstractions;
-using WinAdmin.Core.Environment;
+using WinAdmin.Core.EnvironmentChecks;
 using WinAdmin.Core.Security;
 
 namespace WinAdmin.Api.Controllers;
