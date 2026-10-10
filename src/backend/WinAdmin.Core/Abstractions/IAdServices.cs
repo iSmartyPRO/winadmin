@@ -120,10 +120,18 @@ public interface INtfsAccess
 
 public sealed record MembershipRequest(string GroupDn, string Member, bool Add, bool RemoveFromOther = true);
 
+public sealed record CreateFolderRequest(string ProjectDn, string Path, string BaseName, string? OrgCode, bool CreateDirectory);
+
+public sealed record FolderPreview(string FullGroup, string ReadGroup, string Unc, string GroupsOuDn);
+
 /// <summary>Модуль «Папки»: проверки зоны/области/префикса и аудит — внутри.</summary>
 public interface IAdFoldersService
 {
     Task<FolderCatalogResult> ListAsync(IAccessContext actor, string? projectDn, string? q, CancellationToken ct = default);
     Task<IReadOnlyList<UserFolderAccess>> UserAccessAsync(IAccessContext actor, string sam, CancellationToken ct = default);
     Task<IReadOnlyList<ScenarioStep>> ChangeMembershipAsync(IAccessContext actor, MembershipRequest request, CancellationToken ct = default);
+    Task<FolderPreview> PreviewAsync(IAccessContext actor, CreateFolderRequest request, CancellationToken ct = default);
+    Task<IReadOnlyList<ScenarioStep>> CreateFolderAsync(IAccessContext actor, CreateFolderRequest request, CancellationToken ct = default);
+    Task<FolderAclState> InspectAclAsync(IAccessContext actor, string path, CancellationToken ct = default);
+    Task<IReadOnlyList<ScenarioStep>> FixAclAsync(IAccessContext actor, string path, CancellationToken ct = default);
 }
