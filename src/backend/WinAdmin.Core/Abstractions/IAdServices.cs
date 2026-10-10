@@ -97,3 +97,23 @@ public interface IAdFolderDirectory
     /// <summary>Пользователь или группа по sAMAccountName или DN.</summary>
     Task<AdMember?> FindMemberAsync(string samOrDn, CancellationToken ct = default);
 }
+
+/// <summary>Нужное правило NTFS: SID группы, подпись (Full/Read), права (имя FileSystemRights).</summary>
+public sealed record AclNeed(string Sid, string Label, string Rights);
+
+public sealed record FolderAclState(bool Exists, IReadOnlyList<string> Missing, IReadOnlyList<string> Warnings)
+{
+    public bool Ok => Exists && Missing.Count == 0;
+}
+
+/// <summary>Папки файлового сервера: под учёткой записи (служебная — имперсонация, учётка службы — как есть).</summary>
+public interface INtfsAccess
+{
+    Task<bool> DirectoryExistsAsync(string unc, CancellationToken ct = default);
+    Task CreateDirectoryAsync(string unc, CancellationToken ct = default);
+    Task<FolderAclState> InspectAsync(string unc, IReadOnlyList<AclNeed> needs, CancellationToken ct = default);
+    /// <summary>Добавить недостающие Allow-правила; возвращает число добавленных.</summary>
+    Task<int> GrantAsync(string unc, IReadOnlyList<AclNeed> needs, CancellationToken ct = default);
+    /// <summary>Есть ли явное Allow «Изменение разрешений» (или полный доступ) для одного из SID.</summary>
+    Task<bool> HasExplicitChangePermissionsAsync(string unc, IReadOnlyCollection<string> sids, CancellationToken ct = default);
+}

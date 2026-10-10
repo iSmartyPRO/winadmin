@@ -1123,14 +1123,14 @@ using WinAdmin.Core.ActiveDirectory;
 namespace WinAdmin.Infrastructure.ActiveDirectory.Folders;
 
 /// <summary>Доступ к шаре под служебной учёткой: LogonUser(NEW_CREDENTIALS) — сетевые обращения идут от её имени.</summary>
-public static partial class Impersonation
+public static class Impersonation
 {
     private const int Logon32LogonNewCredentials = 9;
     private const int Logon32ProviderWinnt50 = 3;
 
-    [LibraryImport("advapi32.dll", EntryPoint = "LogonUserW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
+    [DllImport("advapi32.dll", EntryPoint = "LogonUserW", SetLastError = true, CharSet = CharSet.Unicode)]
     [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool LogonUser(string user, string? domain, string password, int logonType, int provider, out SafeAccessTokenHandle token);
+    private static extern bool LogonUser(string user, string? domain, string password, int logonType, int provider, out SafeAccessTokenHandle token);
 
     public static T Run<T>(AdWriteCredential credential, string? domain, Func<T> action)
     {
