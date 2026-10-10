@@ -61,6 +61,7 @@ public static class DependencyInjection
         services.AddSingleton<IAdStructureStore, AdStructureStore>();
         services.AddSingleton<IAdWriter, LdapAdWriter>();
         services.AddScoped<IAdUsersService, AdUsersService>();
+        services.AddSingleton<IAdFolderDirectory>(sp => new WinAdmin.Infrastructure.ActiveDirectory.Folders.LdapAdFolderDirectory(sp.GetRequiredService<IDirectorySettingsStore>()));
         services.AddSingleton<IAdUserDirectory>(sp => new LdapAdUserDirectory(
             sp.GetRequiredService<IDirectorySettingsStore>(), sp.GetRequiredService<IAdStructureStore>()));
         services.AddSingleton<IEnvironmentService, EnvironmentService>();

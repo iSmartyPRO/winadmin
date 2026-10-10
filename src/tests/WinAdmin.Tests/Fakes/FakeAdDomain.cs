@@ -1,5 +1,6 @@
 using WinAdmin.Core.Abstractions;
 using WinAdmin.Core.ActiveDirectory;
+using WinAdmin.Core.ActiveDirectory.Folders;
 using WinAdmin.Core.ActiveDirectory.Users;
 
 namespace WinAdmin.Tests.Fakes;
@@ -8,7 +9,7 @@ namespace WinAdmin.Tests.Fakes;
 /// Домен в памяти: каталог (IAdUserDirectory) и запись (IAdWriter) над одним состоянием.
 /// Основная группа моделируется как в AD: смена primaryGroupID делает прежнюю основную группу обычным членством.
 /// </summary>
-public sealed class FakeAdDomain : IAdUserDirectory, IAdWriter
+public sealed class FakeAdDomain : IAdUserDirectory, IAdWriter, IAdFolderDirectory
 {
     public const string DomainSid = "S-1-5-21-7-8-9";
     private int _rid = 2000;
@@ -32,6 +33,9 @@ public sealed class FakeAdDomain : IAdUserDirectory, IAdWriter
         public required string Dn { get; init; }
         public required string Sid { get; init; }
         public HashSet<string> Members { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public string? Description { get; set; }
+        public string? Info { get; set; }
+        public bool IsSecurity { get; set; } = true;
     }
 
     public List<User> Users { get; } = [];
@@ -185,7 +189,9 @@ public sealed class FakeAdDomain : IAdUserDirectory, IAdWriter
     public Task<string> CreateGroupAsync(string ouDn, string cn, string description, CancellationToken ct = default)
     {
         Call("CreateGroup", ouDn);
-        return Task.FromResult(AddGroup(cn, ouDn).Dn);
+        var g = AddGroup(cn, ouDn);
+        g.Description = description;
+        return Task.FromResult(g.Dn);
     }
 
     public Task SetPhotoAsync(string userDn, byte[]? photo, CancellationToken ct = default)
@@ -193,5 +199,40 @@ public sealed class FakeAdDomain : IAdUserDirectory, IAdWriter
         Call(photo is null ? "RemovePhoto" : "SetPhoto", userDn);
         ByDn(userDn).Photo = photo;
         return Task.CompletedTask;
+    }
+
+    // ── IAdFolderDirectory ───────────────────────────────────────
+    private AdFolderGroup ToFolderGroup(Group g)
+        => new(g.Dn, g.Name, g.Sid, g.Description, g.Info, g.IsSecurity, g.Members.ToList());
+
+    public Task<IReadOnlyList<AdFolderGroup>> ListGroupsAsync(string baseDn, string prefix, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<AdFolderGroup>>(Groups
+            .Where(g => g.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && DnUtils.IsUnderOrSame(g.Dn, baseDn))
+            .Select(ToFolderGroup).ToList());
+
+    public Task<IReadOnlyDictionary<string, AdMember>> ResolveMembersAsync(IEnumerable<string> dns, CancellationToken ct = default)
+    {
+        var set = new HashSet<string>(dns, StringComparer.OrdinalIgnoreCase);
+        var result = new Dictionary<string, AdMember>(StringComparer.OrdinalIgnoreCase);
+        foreach (var u in Users.Where(u => set.Contains(u.Dn)))
+            result[u.Dn] = new AdMember(u.Dn, u.Attributes.GetValueOrDefault("displayName") ?? u.Sam, u.Sam, false, u.Enabled);
+        foreach (var g in Groups.Where(g => set.Contains(g.Dn)))
+            result[g.Dn] = new AdMember(g.Dn, g.Name, g.Name, true, true);
+        return Task.FromResult<IReadOnlyDictionary<string, AdMember>>(result);
+    }
+
+    public Task<AdFolderGroup?> GetGroupAsync(string dn, CancellationToken ct = default)
+        => Task.FromResult(Groups.FirstOrDefault(g => g.Dn.Equals(dn, StringComparison.OrdinalIgnoreCase)) is { } g ? ToFolderGroup(g) : null);
+
+    public Task<AdFolderGroup?> FindGroupByNameAsync(string sam, CancellationToken ct = default)
+        => Task.FromResult(Groups.FirstOrDefault(g => g.Name.Equals(sam, StringComparison.OrdinalIgnoreCase)) is { } g ? ToFolderGroup(g) : null);
+
+    public Task<AdMember?> FindMemberAsync(string samOrDn, CancellationToken ct = default)
+    {
+        if (Users.FirstOrDefault(u => u.Sam.Equals(samOrDn, StringComparison.OrdinalIgnoreCase) || u.Dn.Equals(samOrDn, StringComparison.OrdinalIgnoreCase)) is { } u)
+            return Task.FromResult<AdMember?>(new AdMember(u.Dn, u.Attributes.GetValueOrDefault("displayName") ?? u.Sam, u.Sam, false, u.Enabled));
+        if (Groups.FirstOrDefault(g => g.Name.Equals(samOrDn, StringComparison.OrdinalIgnoreCase) || g.Dn.Equals(samOrDn, StringComparison.OrdinalIgnoreCase)) is { } g)
+            return Task.FromResult<AdMember?>(new AdMember(g.Dn, g.Name, g.Name, true, true));
+        return Task.FromResult<AdMember?>(null);
     }
 }

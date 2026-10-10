@@ -1,3 +1,4 @@
+using WinAdmin.Core.ActiveDirectory.Folders;
 using WinAdmin.Core.Operations;
 using WinAdmin.Core.Security;
 using WinAdmin.Core.Models;
@@ -83,4 +84,16 @@ public interface IAdUsersService
     Task<string?> ResetPasswordAsync(IAccessContext actor, string sam, string? password, bool generate, bool mustChange, CancellationToken ct = default);
     Task<IReadOnlyList<ScenarioStep>> DeactivateAsync(IAccessContext actor, string sam, CancellationToken ct = default);
     Task<ActivationResult> ActivateAsync(IAccessContext actor, string sam, string projectDn, CancellationToken ct = default);
+}
+
+/// <summary>Группы доступа к папкам и их участники (учётка компьютера).</summary>
+public interface IAdFolderDirectory
+{
+    Task<IReadOnlyList<AdFolderGroup>> ListGroupsAsync(string baseDn, string prefix, CancellationToken ct = default);
+    Task<IReadOnlyDictionary<string, AdMember>> ResolveMembersAsync(IEnumerable<string> dns, CancellationToken ct = default);
+    Task<AdFolderGroup?> GetGroupAsync(string dn, CancellationToken ct = default);
+    /// <summary>Группа по sAMAccountName во всём домене.</summary>
+    Task<AdFolderGroup?> FindGroupByNameAsync(string sam, CancellationToken ct = default);
+    /// <summary>Пользователь или группа по sAMAccountName или DN.</summary>
+    Task<AdMember?> FindMemberAsync(string samOrDn, CancellationToken ct = default);
 }
