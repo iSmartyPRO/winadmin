@@ -1375,8 +1375,8 @@ public abstract class AdFoldersTestBase
         Ad.AddGroup("sg_outside_full", "OU=Other,DC=test,DC=local").Description = @"A:\Out;Full Access";
         Ad.AddUser("ivan", "OU=Users," + A, DocsRead.Dn);
 
-        var structure = Mock.Of<IAdStructureStore>(m => m.GetAsync(It.IsAny<CancellationToken>()) ==
-            Task.FromResult(AdStructureSettings.Default with { RootOu = Root, HiddenOus = ["IT"] }));
+        var structureSettings = AdStructureSettings.Default with { RootOu = Root, HiddenOus = ["IT"] };
+        var structure = Mock.Of<IAdStructureStore>(m => m.GetAsync(It.IsAny<CancellationToken>()) == Task.FromResult(structureSettings));
         var modules = new Mock<IModuleRegistry>();
         modules.Setup(m => m.GetSettingsAsync<AdFoldersSettings>(AdFoldersModule.ModuleId, It.IsAny<CancellationToken>())).ReturnsAsync(() => Settings);
         var audit = new Mock<IAuditService>();

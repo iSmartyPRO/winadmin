@@ -117,3 +117,13 @@ public interface INtfsAccess
     /// <summary>Есть ли явное Allow «Изменение разрешений» (или полный доступ) для одного из SID.</summary>
     Task<bool> HasExplicitChangePermissionsAsync(string unc, IReadOnlyCollection<string> sids, CancellationToken ct = default);
 }
+
+public sealed record MembershipRequest(string GroupDn, string Member, bool Add, bool RemoveFromOther = true);
+
+/// <summary>Модуль «Папки»: проверки зоны/области/префикса и аудит — внутри.</summary>
+public interface IAdFoldersService
+{
+    Task<FolderCatalogResult> ListAsync(IAccessContext actor, string? projectDn, string? q, CancellationToken ct = default);
+    Task<IReadOnlyList<UserFolderAccess>> UserAccessAsync(IAccessContext actor, string sam, CancellationToken ct = default);
+    Task<IReadOnlyList<ScenarioStep>> ChangeMembershipAsync(IAccessContext actor, MembershipRequest request, CancellationToken ct = default);
+}
