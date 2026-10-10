@@ -31,6 +31,7 @@ public sealed class NetworkApiFactory : WebApplicationFactory<Program>
     public FakeWindowsReader Windows { get; } = new();
     public FakeAdReader AdReader { get; } = new();
     public FakeAdDomain AdDomain { get; } = new();
+    public FakeNtfs Ntfs { get; } = new();
     public DirectorySettings DirectorySettings { get; set; } = new(true, "test.local", null, null, false);
 
     /// <summary>Клиент, чьи запросы сервер видит пришедшими с указанного адреса (только в тестах).</summary>
@@ -74,6 +75,10 @@ public sealed class NetworkApiFactory : WebApplicationFactory<Program>
             if (monitor is not null) services.Remove(monitor);
             services.RemoveAll<IAdUserDirectory>();
             services.AddSingleton<IAdUserDirectory>(AdDomain);
+            services.RemoveAll<IAdFolderDirectory>();
+            services.AddSingleton<IAdFolderDirectory>(AdDomain);
+            services.RemoveAll<INtfsAccess>();
+            services.AddSingleton<INtfsAccess>(Ntfs);
             services.RemoveAll<IAdWriter>();
             services.AddSingleton<IAdWriter>(AdDomain);
             services.RemoveAll<IMachineInfo>();

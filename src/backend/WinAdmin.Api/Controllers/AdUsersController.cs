@@ -23,6 +23,8 @@ public sealed class AdErrorsAttribute : ExceptionFilterAttribute
         {
             DirectoryUnavailableException e => new ObjectResult(new { message = e.Message }) { StatusCode = 503 },
             AdWriteException e => new ObjectResult(new { message = e.Message }) { StatusCode = 422 },
+            UnauthorizedAccessException e => new ObjectResult(new { message = e.Message }) { StatusCode = 422 },
+            IOException e => new ObjectResult(new { message = e.Message }) { StatusCode = 422 },
             _ => null,
         };
         if (context.Result is not null) context.ExceptionHandled = true;

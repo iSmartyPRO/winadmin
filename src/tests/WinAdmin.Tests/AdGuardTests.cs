@@ -72,6 +72,15 @@ public sealed class ScenarioRunnerTests
     }
 
     [Fact]
+    public async Task File_server_errors_are_shown_to_the_operator()
+    {
+        var run = new ScenarioRunner();
+        await run.RunAsync("Папка", () => throw new UnauthorizedAccessException(@"Отказано в доступе по пути \fs01\Projects\X"));
+        await run.RunAsync("Права", () => throw new IOException("Сетевой путь не найден"));
+        Assert.Contains("Отказано в доступе", run.Steps[0].Message);
+    }
+
+    [Fact]
     public async Task Unexpected_exception_is_hidden_from_user_and_logged()
     {
         var logged = new List<Exception>();

@@ -16,6 +16,7 @@ public sealed class AdProjectsController(IAdReader reader, IModuleRegistry modul
     private static readonly (string Module, string Permission)[] Sources =
     [
         (AdUsersModule.ModuleId, PermissionIds.AdUsersRead),
+        (WinAdmin.Core.ActiveDirectory.Folders.AdFoldersModule.ModuleId, PermissionIds.AdFoldersRead),
     ];
 
     [HttpGet]

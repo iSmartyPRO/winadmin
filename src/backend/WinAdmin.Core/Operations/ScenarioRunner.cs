@@ -40,8 +40,9 @@ public sealed class ScenarioRunner(Action<Exception>? log = null)
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             Failed = true;
+            // Ошибки файлового сервера (нет доступа, путь не найден) — тоже понятны оператору.
             bool expected = ex is AdWriteException or DirectoryUnavailableException or AccessDeniedException
-                or ArgumentException or InvalidOperationException;
+                or ArgumentException or InvalidOperationException or UnauthorizedAccessException or IOException;
             if (!expected) log?.Invoke(ex);
             _steps.Add(new(name, StepStatus.Failed, expected ? ex.Message : "Внутренняя ошибка — подробности в журнале службы"));
             return false;
