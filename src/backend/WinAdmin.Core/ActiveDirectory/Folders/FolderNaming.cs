@@ -26,7 +26,7 @@ public static partial class FolderNaming
     /// <summary>Путь из описания группы → UNC. Несопоставленная буква, «..» или не путь — ArgumentException.</summary>
     public static string ToUnc(string path, IReadOnlyDictionary<char, string> mappings)
     {
-        string p = path.Trim().TrimEnd('\\');
+        string p = FolderDescriptionParser.CleanPath(path);
         if (p.Split('\\', '/').Any(s => s == ".."))
             throw new ArgumentException("Путь не должен содержать «..».");
         if (p.StartsWith(@"\\"))

@@ -67,6 +67,19 @@ public sealed class FolderCatalogTests
     }
 
     [Fact]
+    public void Doubled_backslashes_are_the_same_folder()
+    {
+        var result = FolderCatalog.Build([
+            G("sg_a_t_full", @"P:\\5-Training.Amur;Full Access"),
+            G("sg_a_t_read", @"P:\5-Training.Amur\;Read Only"),
+        ], Members, Root, ['P']);
+        var folder = Assert.Single(result.Folders);
+        Assert.Equal(@"P:\5-Training.Amur", folder.Path);
+        Assert.NotNull(folder.Full);
+        Assert.NotNull(folder.Read);
+    }
+
+    [Fact]
     public void Warnings_for_duplicates_missing_pair_and_unmapped_drive()
     {
         var result = FolderCatalog.Build([
@@ -126,6 +139,7 @@ public sealed class FolderNamingTests
         Assert.Equal(@"\\fs01\Projects\Проект\Docs", FolderNaming.ToUnc(@"A:\Проект\Docs", Map));
         Assert.Equal(@"\\fs02\B\X", FolderNaming.ToUnc(@"B:\X\", Map));
         Assert.Equal(@"\\fs03\s\X", FolderNaming.ToUnc(@"\\fs03\s\X", Map));
+        Assert.Equal(@"\\fs01\Projects\1-Consulting", FolderNaming.ToUnc(@"A:\\1-Consulting", Map));
     }
 
     [Theory]

@@ -19,7 +19,7 @@ public static class FolderCatalog
             }
             string key = FolderDescriptionParser.NormalizeKey(parsed.Path);
             if (!byKey.TryGetValue(key, out var entry))
-                byKey[key] = entry = (parsed.Path.TrimEnd('\\', '/'), project, []);
+                byKey[key] = entry = (parsed.Path, project, []);
             entry.Items.Add((g, parsed));
         }
 

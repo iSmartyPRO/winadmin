@@ -12,7 +12,7 @@ public static class FolderDescriptionParser
         int index = parts.FindIndex(IsPath);
         if (index < 0) return null;
 
-        string path = parts[index];
+        string path = CleanPath(parts[index]);
         string candidate = string.Join(" ", parts.Skip(index + 1)).Trim();
         var (access, accessText) = Normalize(candidate);
         if (access is null)
@@ -26,8 +26,20 @@ public static class FolderDescriptionParser
         return new ParsedFolder(path, access ?? FolderAccess.Other, accessText);
     }
 
-    /// <summary>Ключ папки: без учёта регистра и завершающих «\» «/».</summary>
-    public static string NormalizeKey(string path) => Key(path.Trim().TrimEnd('\\', '/'));
+    /// <summary>Ключ папки: без учёта регистра, повторных и завершающих разделителей.</summary>
+    public static string NormalizeKey(string path) => Key(CleanPath(path));
+
+    /// <summary>
+    /// «P:\\1-Consulting\» → «P:\1-Consulting»: повторные «\» «/» схлопываются (в описаниях AD встречаются оба написания),
+    /// ведущий «\\» UNC-пути сохраняется, завершающий разделитель убирается.
+    /// </summary>
+    public static string CleanPath(string path)
+    {
+        string p = path.Trim();
+        bool unc = p.StartsWith(@"\\") || p.StartsWith("//");
+        string body = string.Join('\\', p.Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries));
+        return unc ? @"\\" + body : body;
+    }
 
     private static bool IsPath(string s) => s.Contains(@":\") || s.StartsWith(@"\\") || s.StartsWith('/');
 
