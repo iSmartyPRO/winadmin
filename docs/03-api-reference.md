@@ -66,6 +66,21 @@ SSO текущим пользователем Windows. `404` — вход дом
 | POST | `/ad/users/{sam}/deactivate` → шаги | `ad-users.offboard` |
 | POST | `/ad/users/{sam}/activate` `{ projectDn }` → `{ steps, password }` | `ad-users.offboard` |
 
+## Папки (модуль `ad-folders`)
+
+Права `ad-folders.read`, `ad-folders.membership`, `ad-folders.create` — с областью «Проекты (OU)». Папка — путь из
+описания групп `sg_*` («`A:\Путь;Full Access`» / «`;Read Only`»), проект папки — проект её групп.
+
+| Метод | Путь | Право |
+|---|---|---|
+| GET | `/ad/folders?project=&q=` → `{ folders, unparsed }` | `ad-folders.read` |
+| GET | `/ad/folders/user/{sam}` → папки пользователя (Full/Read) | `ad-folders.read` |
+| POST | `/ad/folders/membership` `{ groupDn, member, add, removeFromOther }` → шаги | `ad-folders.membership` |
+| POST | `/ad/folders/preview` `{ projectDn, path, baseName, orgCode?, createDirectory }` → имена групп и UNC | `ad-folders.create` |
+| POST | `/ad/folders` (то же тело) → шаги: группа Full, группа Read, папка, права NTFS | `ad-folders.create` |
+| GET | `/ad/folders/acl?path=` → `{ exists, missing, warnings, ok }` | `ad-folders.read` |
+| POST | `/ad/folders/acl-fix` `{ path }` → шаги | `ad-folders.create` |
+
 ### `GET /directory/search?q=<текст>&kind=user|group` — право `platform.roles.manage`
 Пользователи и группы AD для назначения ролей: `[{ sid, kind, samAccountName, displayName, upn, enabled }]`.
 `503` — контроллер домена недоступен.
