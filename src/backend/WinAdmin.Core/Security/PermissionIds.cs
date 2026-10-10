@@ -23,6 +23,9 @@ public static class PermissionIds
     public const string AdUsersMove = "ad-users.move";
     public const string AdUsersPassword = "ad-users.password";
     public const string AdUsersOffboard = "ad-users.offboard";
+    public const string AdFoldersRead = "ad-folders.read";
+    public const string AdFoldersMembership = "ad-folders.membership";
+    public const string AdFoldersCreate = "ad-folders.create";
 
     public const string PlatformUsersManage = "platform.users.manage";
     public const string PlatformRolesManage = "platform.roles.manage";
