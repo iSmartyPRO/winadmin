@@ -56,13 +56,15 @@ public sealed class ModuleRegistry(
         var stored = StoredSettings(id);
         var view = new JsonObject();
         if (module.SettingsType is null) return Task.FromResult(view);
+        // Несохранённые поля показываются со значениями по умолчанию из класса настроек.
+        var defaults = JsonSerializer.SerializeToNode(Activator.CreateInstance(module.SettingsType), module.SettingsType, Json) as JsonObject ?? [];
         foreach (var p in Properties(module.SettingsType))
         {
             string name = JsonNamingPolicy.CamelCase.ConvertName(p.Name);
             if (ModuleSettingsSchema.IsSecret(p))
                 view[name] = new JsonObject { ["isSet"] = stored[name] is JsonValue v && v.GetValue<string>().Length > 0 };
             else
-                view[name] = stored[name]?.DeepClone();
+                view[name] = (stored[name] ?? defaults[name])?.DeepClone();
         }
         return Task.FromResult(view);
     }
@@ -89,7 +91,12 @@ public sealed class ModuleRegistry(
                 }
                 continue;
             }
-            merged[name] = incoming?.DeepClone();
+            // Пустое значение нестрокового поля (очищенное число, список) — вернуть значение по умолчанию.
+            bool empty = incoming is null || (incoming is JsonValue ev && ev.TryGetValue<string>(out var es) && es.Length == 0);
+            if (empty && p.PropertyType != typeof(string))
+                merged.Remove(name);
+            else
+                merged[name] = incoming?.DeepClone();
             changed.Add(name);
         }
 

@@ -134,6 +134,31 @@ public sealed class ModuleRegistryTests : IDisposable
     }
 
     [Fact]
+    public async Task View_shows_defaults_for_fields_never_saved()
+    {
+        var registry = Registry(new ServerOnlyModule(ModuleRequirements.None));
+        var view = await registry.GetSettingsViewAsync("dir");
+        Assert.Equal(389, view["port"]!.GetValue<int>());
+        Assert.Empty(view["hiddenOus"]!.AsArray());
+        Assert.False(view["servicePassword"]!["isSet"]!.GetValue<bool>());
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public async Task Empty_number_resets_to_default_instead_of_failing(string? empty)
+    {
+        var registry = Registry(new ServerOnlyModule(ModuleRequirements.None));
+        await registry.SaveSettingsAsync("dir", new JsonObject { ["port"] = 636 }, "admin");
+        await registry.SaveSettingsAsync("dir", new JsonObject { ["port"] = empty, ["serviceUser"] = "svc" }, "admin");
+
+        var typed = await registry.GetSettingsAsync<DirectoryTestSettings>("dir");
+        Assert.Equal(389, typed.Port);
+        Assert.Equal("svc", typed.ServiceUser);
+        Assert.Equal(389, (await registry.GetSettingsViewAsync("dir"))["port"]!.GetValue<int>());
+    }
+
+    [Fact]
     public async Task Wrong_types_are_rejected()
     {
         var registry = Registry(new ServerOnlyModule(ModuleRequirements.None));
