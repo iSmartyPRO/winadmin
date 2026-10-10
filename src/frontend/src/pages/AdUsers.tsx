@@ -6,7 +6,7 @@ import {
 import { CopyOutlined, ReloadOutlined, UserOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { api } from '../api/client'
-import type { AdProject, AdUserCard, AdUserStatus, AdUserView, AuditEntryDto, ScenarioStep } from '../api/types'
+import type { AdProject, AdUserCard, AdUserStatus, AdUserView, AuditEntryDto, ScenarioStep, UserFolderAccess } from '../api/types'
 import { useAuth } from '../auth/AuthProvider'
 import PageHeader from '../components/PageHeader'
 
@@ -42,8 +42,9 @@ function UserCard({ sam, projects, onClose, onChanged }: {
   sam?: string; projects: AdProject[]; onClose: () => void; onChanged: () => void
 }) {
   const { message, modal } = App.useApp()
-  const { can } = useAuth()
+  const { can, moduleOn } = useAuth()
   const [card, setCard] = useState<AdUserCard>()
+  const [folderAccess, setFolderAccess] = useState<UserFolderAccess[]>()
   const [photoUrl, setPhotoUrl] = useState<string>()
   const [history, setHistory] = useState<AuditEntryDto[]>([])
   const [form] = Form.useForm()
@@ -58,12 +59,13 @@ function UserCard({ sam, projects, onClose, onChanged }: {
       setCard(c)
       form.setFieldsValue(c.user.attributes)
       setHistory(await api.ad.history(sam).catch(() => []))
+      if (moduleOn('ad-folders') && can('ad-folders.read')) setFolderAccess(await api.folders.userAccess(sam).catch(() => []))
       if (c.user.hasPhoto) setPhotoUrl(URL.createObjectURL(await api.ad.photo(sam)))
       else setPhotoUrl(undefined)
     } catch (e) {
       message.error(errorText(e, 'Не удалось загрузить пользователя'))
     }
-  }, [sam, form, message])
+  }, [sam, form, message, moduleOn, can])
 
   useEffect(() => { setSteps(undefined); setCard(undefined); load() }, [load])
 
@@ -154,6 +156,12 @@ function UserCard({ sam, projects, onClose, onChanged }: {
                 )}
               </Space>
             ) },
+            ...(folderAccess ? [{ key: 'folders', label: `Папки (${folderAccess.length})`, children: (
+              <List size="small" dataSource={folderAccess} locale={{ emptyText: 'Нет доступа к папкам' }} renderItem={(f) => (
+                <List.Item><Space>{f.path}<Typography.Text type="secondary">{f.projectName}</Typography.Text>
+                  {f.hasFull && <Tag color="green">Full</Tag>}{f.hasRead && <Tag color="blue">Read</Tag>}</Space></List.Item>
+              )} />
+            ) }] : []),
             { key: 'history', label: 'История', children: (
               <List size="small" dataSource={history} locale={{ emptyText: 'Нет записей' }} renderItem={(h) => (
                 <List.Item><Space direction="vertical" size={0}>

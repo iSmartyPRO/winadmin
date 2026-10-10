@@ -373,3 +373,16 @@ export interface AdUserCard { user: AdUserView; groups: AdGroupRef[] }
 export interface ScenarioStep { name: string; status: 'Ok' | 'Skipped' | 'Failed'; message: string | null }
 export interface ActivationResult { steps: ScenarioStep[]; password: string | null }
 export type AdUserStatus = 'active' | 'disabled' | 'terminated' | 'all'
+
+export interface AdMember { dn: string; name: string; sam: string | null; isGroup: boolean; enabled: boolean }
+export interface FolderGroupView { dn: string; name: string; sid: string | null; members: AdMember[] }
+export interface AdFolder {
+  path: string; projectDn: string | null; projectName: string | null
+  full: FolderGroupView | null; read: FolderGroupView | null; others: FolderGroupView[]; warnings: string[]
+}
+export interface UnparsedGroup { dn: string; name: string; projectName: string | null; reason: string }
+export interface FolderCatalogResult { folders: AdFolder[]; unparsed: UnparsedGroup[] }
+export interface UserFolderAccess { projectName: string | null; path: string; hasFull: boolean; hasRead: boolean }
+export interface CreateFolderRequest { projectDn: string; path: string; baseName: string; orgCode?: string; createDirectory: boolean }
+export interface FolderPreview { fullGroup: string; readGroup: string; unc: string; groupsOuDn: string }
+export interface FolderAclState { exists: boolean; missing: string[]; warnings: string[]; ok: boolean }

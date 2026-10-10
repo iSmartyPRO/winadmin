@@ -12,6 +12,7 @@ import type {
   DirectorySettings, DirectoryTestStep, DirectoryEntry,
   AdStructureSettings, SaveAdStructure, EnvironmentReport,
   AdProject, AdUserView, AdUserCard, AdUserStatus, ScenarioStep, ActivationResult,
+  FolderCatalogResult, UserFolderAccess, CreateFolderRequest, FolderPreview, FolderAclState,
 } from './types'
 
 // ── JWT storage (sessionStorage — очищается при закрытии вкладки) ──
@@ -163,6 +164,17 @@ export const api = {
     deactivate: (sam: string) => http.post<ScenarioStep[]>(`/ad/users/${encodeURIComponent(sam)}/deactivate`).then((r) => r.data),
     activate: (sam: string, projectDn: string) =>
       http.post<ActivationResult>(`/ad/users/${encodeURIComponent(sam)}/activate`, { projectDn }).then((r) => r.data),
+  },
+
+  folders: {
+    list: (params: { project?: string; q?: string }) => http.get<FolderCatalogResult>('/ad/folders', { params }).then((r) => r.data),
+    userAccess: (sam: string) => http.get<UserFolderAccess[]>(`/ad/folders/user/${encodeURIComponent(sam)}`).then((r) => r.data),
+    membership: (body: { groupDn: string; member: string; add: boolean; removeFromOther: boolean }) =>
+      http.post<ScenarioStep[]>('/ad/folders/membership', body).then((r) => r.data),
+    preview: (body: CreateFolderRequest) => http.post<FolderPreview>('/ad/folders/preview', body).then((r) => r.data),
+    create: (body: CreateFolderRequest) => http.post<ScenarioStep[]>('/ad/folders', body).then((r) => r.data),
+    acl: (path: string) => http.get<FolderAclState>('/ad/folders/acl', { params: { path } }).then((r) => r.data),
+    fixAcl: (path: string) => http.post<ScenarioStep[]>('/ad/folders/acl-fix', { path }).then((r) => r.data),
   },
 
   adStructure: {

@@ -22,6 +22,7 @@ import Updates from './pages/Updates'
 import Modules from './pages/Modules'
 import Environment from './pages/Environment'
 import AdUsers from './pages/AdUsers'
+import AdFolders from './pages/AdFolders'
 import Roles from './pages/Roles'
 
 export default function App() {
@@ -59,6 +60,7 @@ export default function App() {
           <Route path="/cp/settings" element={<Guard perm={['platform.network.manage', 'eventlogs.manage']}><Settings /></Guard>} />
           <Route path="/cp/roles" element={<Guard perm="platform.roles.manage"><Roles /></Guard>} />
           <Route path="/ad/users" element={<Guard perm="ad-users.read" module="ad-users"><AdUsers /></Guard>} />
+          <Route path="/ad/folders" element={<Guard perm="ad-folders.read" module="ad-folders"><AdFolders /></Guard>} />
           <Route path="/cp/modules" element={<Guard perm="platform.modules.manage"><Modules /></Guard>} />
           <Route path="/cp/environment" element={<Guard perm="platform.environment.check"><Environment /></Guard>} />
           <Route path="/docs" element={<ApiDocs />} />
