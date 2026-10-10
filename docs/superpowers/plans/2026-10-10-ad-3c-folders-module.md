@@ -2052,8 +2052,8 @@ public sealed class AdFoldersCheckTests
 
     private async Task<Dictionary<string, CheckResult>> RunAsync(CheckDepth depth = CheckDepth.Quick)
     {
-        var st = Mock.Of<IAdStructureStore>(m => m.GetAsync(It.IsAny<CancellationToken>()) ==
-            Task.FromResult(AdStructureSettings.Default with { RootOu = Root }));
+        var structureSettings = AdStructureSettings.Default with { RootOu = Root };
+        var st = Mock.Of<IAdStructureStore>(m => m.GetAsync(It.IsAny<CancellationToken>()) == Task.FromResult(structureSettings));
         var modules = new Mock<IModuleRegistry>();
         modules.Setup(m => m.GetSettingsAsync<AdFoldersSettings>(AdFoldersModule.ModuleId, It.IsAny<CancellationToken>())).ReturnsAsync(() => _settings);
         return (await new AdFoldersCheck(_reader, _ad, _ad, _ntfs, st, modules.Object).RunAsync(depth, default)).ToDictionary(r => r.Code);
