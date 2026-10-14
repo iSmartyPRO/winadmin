@@ -84,7 +84,7 @@ public static class NetworkCommands
         var enableOpt = new Option<bool>("--enable", "Включить HTTPS на основном порту");
         var disableOpt = new Option<bool>("--disable", "Выключить HTTPS (выбранный сертификат запоминается)");
         var thumbprintOpt = new Option<string?>("--thumbprint", "Отпечаток сертификата из хранилища «Личные» (My)");
-        var storeOpt = new Option<string?>("--store", "Хранилище для --thumbprint: LocalMachine (по умолчанию) или CurrentUser");
+        var storeOpt = new Option<string?>("--store", "Хранилище для --thumbprint: LocalMachine (по умолчанию). CurrentUser не поддерживается — служба работает от LocalSystem");
         var pfxOpt = new Option<string?>("--pfx", "Путь к файлу PFX");
         var pfxPasswordOpt = new Option<string?>("--pfx-password", "Пароль PFX (сохраняется зашифрованным; виден в списке процессов — вводите в доверенной консоли)");
         var selfSignedOpt = new Option<bool>("--self-signed", "Создать самоподписанный сертификат (FQDN, короткое имя, localhost)");
@@ -172,10 +172,47 @@ public static class NetworkCommands
                 PfxPassword: p.GetValueForOption(pfxPasswordOpt),
                 HttpRedirectPort: redirect ?? https.HttpRedirectPort);
             var merged = HttpsSettingsUpdate.Merge(request, current.Https, certificates.ProtectPfxPassword);
+            if ((merged.Enabled || request.Source is not null) && ServiceAccountProblem(merged.Certificate) is string problem)
+            {
+                ctx.ExitCode = Fail(problem);
+                return;
+            }
 
             ctx.ExitCode = CheckAndApply(provider, current with { Https = merged }, current, output, error);
         });
         return cmd;
+    }
+
+    /// <summary>
+    /// Командная строка запускается от администратора, а служба — от LocalSystem: проверка в консоли пройдёт,
+    /// а служба сертификат не найдёт (HTTPS не поднимется, а сторожа отката в CLI нет). Отсекаем такие случаи:
+    /// хранилище CurrentUser (у SYSTEM своё) и PFX на сетевом пути (подключённые диски администратора SYSTEM не видит).
+    /// </summary>
+    public static string? ServiceAccountProblem(HttpsCertificateSettings? certificate, Func<string, DriveType>? driveType = null)
+    {
+        switch (certificate)
+        {
+            case { Source: HttpsCertificateSource.Store, StoreLocation: CertificateStoreLocation.CurrentUser }:
+                return "Хранилище CurrentUser не подходит: служба WinAdmin работает от имени LocalSystem и не видит " +
+                    "личное хранилище администратора. Импортируйте сертификат с закрытым ключом в LocalMachine\\My " +
+                    "(certlm.msc → Личное) и укажите --store LocalMachine.";
+            case { Source: HttpsCertificateSource.Pfx, Path: { Length: > 0 } path }:
+                if (path.StartsWith(@"\\", StringComparison.Ordinal) || path.StartsWith("//", StringComparison.Ordinal))
+                    return $"Файл PFX должен лежать на локальном диске сервера (например C:\\certs\\panel.pfx), а не по сетевому пути: {path}";
+                string? root = Path.GetPathRoot(path);
+                if (!string.IsNullOrEmpty(root) && (driveType ?? DriveTypeOf)(root) == DriveType.Network)
+                    return $"Файл PFX на сетевом диске {root.TrimEnd('\\')}: служба WinAdmin (LocalSystem) не видит подключённые " +
+                        "диски администратора. Скопируйте файл на локальный диск сервера (например C:\\certs\\panel.pfx).";
+                return null;
+            default:
+                return null;
+        }
+    }
+
+    private static DriveType DriveTypeOf(string root)
+    {
+        try { return new DriveInfo(root).DriveType; }
+        catch (ArgumentException) { return DriveType.Unknown; }
     }
 
     private static void ShowHttps(IServiceProvider provider, TextWriter output)

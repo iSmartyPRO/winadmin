@@ -140,7 +140,7 @@ API-ключам (раздел **Роли**, API `/api/v1/roles`, `/api/v1/role-
 принимается** (`400`). Включите HTTPS: **Настройки → Сеть → HTTPS** или из консоли администратора:
 
 ```powershell
-.\WinAdmin.exe network https --enable --thumbprint <отпечаток> [--store LocalMachine|CurrentUser]
+.\WinAdmin.exe network https --enable --thumbprint <отпечаток>     # из LocalMachine\My
 .\WinAdmin.exe network https --enable --pfx C:\certs\panel.pfx --pfx-password "..."
 .\WinAdmin.exe network https --enable --self-signed [--dns panel.corp.local]
 .\WinAdmin.exe network https --redirect-port 80      # 0 — без перенаправления
@@ -151,6 +151,9 @@ API-ключам (раздел **Роли**, API `/api/v1/roles`, `/api/v1/role-
 - **Сертификат:** из хранилища «Личные» (`LocalMachine\My` — рекомендуется; служба работает как SYSTEM),
   файл PFX или самоподписанный, созданный WinAdmin (RSA 2048, 2 года, SAN: полное и короткое имя
   компьютера, `localhost`, дополнительные имена). Самоподписанный хранится в `keys\https.pfx`.
+- **Командная строка** запускается от администратора, а служба — от LocalSystem, поэтому `network https`
+  отклоняет `--store CurrentUser` (личное хранилище администратора службе не видно — импортируйте сертификат
+  в `LocalMachine\My`) и PFX на сетевом пути: UNC (`\\сервер\...`) или подключённый сетевой диск администратора.
 - **Секреты:** пароль PFX хранится в `network.json` только зашифрованным (`ISecretProtector`), API
   возвращает лишь признак «задан»; пароль самоподписанного — случайный, зашифрован в `keys\https.pfx.password`.
   `--pfx-password` в командной строке виден в списке процессов и истории консоли — вводите в доверенной консоли.
