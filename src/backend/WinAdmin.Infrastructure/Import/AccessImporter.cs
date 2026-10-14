@@ -319,13 +319,13 @@ public sealed class AccessImporter(
                 Add(what, from, "—", ImportStatus.NotImported, "нет соответствующей роли в WinAdmin");
                 continue;
             }
-            var found = await directory.FindByDnAsync(p.DistinguishedName, ct);
+            var (found, warning) = await ResolvePrincipalAsync(p, ct);
             if (found is null)
             {
-                Add(what, from, string.Join(", ", targets.Select(t => $"«{t}»")), ImportStatus.NotFoundInAd);
+                Add(what, from, string.Join(", ", targets.Select(t => $"«{t}»")), ImportStatus.NotFoundInAd, warning);
                 continue;
             }
-            PlanAssign(what, from, targets, found, existing);
+            PlanAssign(what, from, targets, found, existing, warning);
         }
 
         foreach (var u in await source.GetPortalUsersAsync(ct))
@@ -353,7 +353,32 @@ public sealed class AccessImporter(
         }
     }
 
-    private void PlanAssign(string what, string from, string[] targets, DirectoryObject found, HashSet<string> existing)
+    /// <summary>
+    /// Как AdRoleResolver.MatchesRole в Access: пользователь — по sAMAccountName (DN мог устареть и указывать на другого
+    /// человека с тем же CN), группа — по DN. Нет sAMAccountName у пользователя — по DN с предупреждением.
+    /// </summary>
+    private async Task<(DirectoryObject? Found, string? Warning)> ResolvePrincipalAsync(AccessRolePrincipal p, CancellationToken ct)
+    {
+        if (!string.Equals(p.PrincipalType, "user", StringComparison.OrdinalIgnoreCase))
+            return (await directory.FindByDnAsync(p.DistinguishedName, ct), null);
+
+        string sam = (p.SamAccountName ?? "").Trim();
+        if (sam.Length == 0)
+            return (await directory.FindByDnAsync(p.DistinguishedName, ct),
+                "в Access нет sAMAccountName — найден по DN, проверьте, что это тот же человек");
+
+        var found = await directory.FindUserAsync(sam, ct);
+        if (found is null)
+            return (null, $"пользователь {sam} не найден по sAMAccountName");
+        if (found.DistinguishedName is not null && !SameDn(found.DistinguishedName, p.DistinguishedName))
+            return (found, $"DN в AD отличается от сохранённого в Access: сейчас «{found.DistinguishedName}» — найден по sAMAccountName {sam}");
+        return (found, null);
+    }
+
+    private static bool SameDn(string a, string b)
+        => string.Equals(DnUtils.Normalize(a), DnUtils.Normalize(b), StringComparison.OrdinalIgnoreCase);
+
+    private void PlanAssign(string what, string from, string[] targets, DirectoryObject found, HashSet<string> existing, string? note = null)
     {
         var type = found.Kind == DirectoryObjectKind.Group ? PrincipalType.AdGroup : PrincipalType.AdUser;
         string display = found.DisplayName ?? found.SamAccountName;
@@ -363,7 +388,7 @@ public sealed class AccessImporter(
             // Добавляем в множество сразу: тот же субъект из role_principals и portal_users назначается один раз.
             if (!existing.Add(Key(roleName, type, found.Sid)))
             {
-                Add(what, from, to, ImportStatus.Exists);
+                Add(what, from, to, ImportStatus.Exists, note);
                 continue;
             }
             Plan(what, from, to, async c =>
@@ -371,7 +396,7 @@ public sealed class AccessImporter(
                 var role = (await roles.ListAsync(c)).Single(r => string.Equals(r.Name, roleName, StringComparison.CurrentCultureIgnoreCase));
                 await roles.AssignAsync(new CreateAssignmentRequest(role.Id, type, found.Sid, display),
                     AdRoleTemplates.SystemContext(catalog, Actor), c);
-            });
+            }, note);
         }
     }
 

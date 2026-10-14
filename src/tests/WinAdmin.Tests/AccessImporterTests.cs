@@ -312,6 +312,38 @@ public sealed class AccessImporterTests : IDisposable
     }
 
     [Fact]
+    public async Task User_principals_are_matched_by_sam_account_name_like_access()
+    {
+        // Устаревший DN из Access теперь принадлежит другому человеку с тем же CN.
+        const string staleDn = "CN=Ivanov,OU=Old,DC=test,DC=local";
+        var namesake = new DirectoryObject("S-1-5-21-10-20-30-9999", DirectoryObjectKind.User, "ivanov.a", "Другой Иванов",
+            "ivanov.a@test.local", staleDn, true);
+        _directory.Users["ivanov.a"] = (namesake, "x", []);
+        _access.RolePrincipals.Clear();
+        _access.PortalUsers.Clear();
+        _access.RolePrincipals.Add(new("hr", "user", "ivanov", staleDn, "Иванов"));
+        _access.RolePrincipals.Add(new("hr", "user", null, _petrov.DistinguishedName!, "Петров"));
+        _access.RolePrincipals.Add(new("hr", "user", "nobody", _petrov.DistinguishedName!, "Никто"));
+
+        var report = await RunAsync(new AccessImportOptions(Apply: true));
+
+        var ivanov = Row(report, "Иванов");
+        Assert.Equal(ImportStatus.Created, ivanov.Status);
+        Assert.Contains("DN", ivanov.Note);
+        Assert.Contains(_ivanov.DistinguishedName!, ivanov.Note);
+        var petrov = Row(report, "Петров");
+        Assert.Equal(ImportStatus.Created, petrov.Status);
+        Assert.Contains("sAMAccountName", petrov.Note);
+        Assert.Equal(ImportStatus.NotFoundInAd, Row(report, "Никто").Status);
+
+        var assignments = await AssignmentsAsync();
+        Assert.Equal(
+            new[] { (AdUsersModule.HrRoleName, "AdUser", _ivanov.Sid), (AdUsersModule.HrRoleName, "AdUser", _petrov.Sid) }.Order(),
+            assignments.Order());
+        Assert.DoesNotContain(assignments, a => a.Sid == namesake.Sid);
+    }
+
+    [Fact]
     public async Task Unknown_access_role_is_not_imported()
     {
         _access.RolePrincipals.Add(new("auditor", "user", "ivanov", _ivanov.DistinguishedName!, "Иванов"));
