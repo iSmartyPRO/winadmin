@@ -39,13 +39,16 @@ public sealed class AdRoleTemplatesTests : IDisposable
         var created = await AdRoleTemplates.EnsureAsync(_roles, Catalog, AdRoleTemplates.All);
         var again = await AdRoleTemplates.EnsureAsync(_roles, Catalog, AdRoleTemplates.All);
 
-        Assert.Equal([AdFoldersModule.AdminRoleName, AdUsersModule.AdminRoleName, AdUsersModule.HrRoleName], created.Order());
+        Assert.Equal([AdFoldersModule.AdminRoleName, AdUsersModule.AdminRoleName, AdUsersModule.HrRoleName, AdFoldersModule.MembersRoleName],
+            created.Order());
         Assert.Empty(again);
         var roles = await _roles.ListAsync();
         Assert.Equal([PermissionIds.AdUsersEdit, PermissionIds.AdUsersMove, PermissionIds.AdUsersRead],
             roles.Single(r => r.Name == AdUsersModule.HrRoleName).Permissions.Select(p => p.PermissionId).Order());
         Assert.Equal(3, roles.Single(r => r.Name == AdFoldersModule.AdminRoleName).Permissions.Count);
         Assert.Equal(5, roles.Single(r => r.Name == AdUsersModule.AdminRoleName).Permissions.Count);
+        Assert.Equal([PermissionIds.AdFoldersMembership, PermissionIds.AdFoldersRead],
+            roles.Single(r => r.Name == AdFoldersModule.MembersRoleName).Permissions.Select(p => p.PermissionId).Order());
     }
 
     [Fact]
@@ -54,7 +57,7 @@ public sealed class AdRoleTemplatesTests : IDisposable
         Assert.Equal(new AdUsersModule().Permissions.Select(p => p.Id).Order(),
             AdRoleTemplates.Users.Single(t => t.Name == AdUsersModule.AdminRoleName).Permissions.Select(p => p.PermissionId).Order());
         Assert.Equal(new AdFoldersModule().Permissions.Select(p => p.Id).Order(),
-            AdRoleTemplates.Folders.Single().Permissions.Select(p => p.PermissionId).Order());
+            AdRoleTemplates.Folders.Single(t => t.Name == AdFoldersModule.AdminRoleName).Permissions.Select(p => p.PermissionId).Order());
     }
 
     [Fact]

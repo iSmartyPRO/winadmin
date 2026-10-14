@@ -50,7 +50,7 @@ public interface IAccessSource
 
 public sealed record AccessImportOptions(bool Apply = false, bool Audit = false, bool Overwrite = false, bool ImportServicePassword = false);
 
-public enum ImportStatus { Created, WillCreate, Exists, Conflict, NotFoundInAd, NotImported }
+public enum ImportStatus { Created, WillCreate, Exists, Conflict, NotFoundInAd, NotImported, Failed }
 
 public sealed record ImportRow(string What, string From, string To, ImportStatus Status, string? Note = null);
 
@@ -61,6 +61,9 @@ public sealed class AccessImportReport
     public List<ImportRow> Rows { get; } = [];
     public List<string> Hints { get; } = [];
 
+    /// <summary>Ошибка, прервавшая применение (без стека и секретов); null — импорт завершён полностью.</summary>
+    public string? Error { get; set; }
+
     public int Count(ImportStatus status) => Rows.Count(r => r.Status == status);
 
     public static string Text(ImportStatus status) => status switch
@@ -70,6 +73,7 @@ public sealed class AccessImportReport
         ImportStatus.Exists => "Пропущено — уже есть",
         ImportStatus.Conflict => "Конфликт",
         ImportStatus.NotFoundInAd => "Не найдено в AD",
+        ImportStatus.Failed => "Ошибка",
         _ => "Не импортируется",
     };
 

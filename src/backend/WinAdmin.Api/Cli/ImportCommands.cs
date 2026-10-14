@@ -1,23 +1,28 @@
 using System.CommandLine;
 using System.CommandLine.Invocation;
 using Npgsql;
+using WinAdmin.Core.Abstractions;
 using WinAdmin.Core.ActiveDirectory;
 using WinAdmin.Core.Import;
 using WinAdmin.Infrastructure.Import;
+using WinAdmin.Infrastructure.Services;
 
 namespace WinAdmin.Api.Cli;
 
-/// <summary>Импорт из портала Access: <c>import access --connection … [--apply] [--audit] [--overwrite] [--import-service-password]</c>.</summary>
+/// <summary>Импорт из портала Access: <c>import access --connection … [--apply] [--audit] [--overwrite] [--import-service-password] [--force]</c>.</summary>
 public static class ImportCommands
 {
     public const string PasswordVariable = "WINADMIN_ACCESS_PG_PASSWORD";
+    /// <summary>Имя службы по умолчанию (releases/install-service.ps1).</summary>
+    public const string ServiceName = "WinAdmin";
 
     public static void Register(Command import, IServiceProvider provider, Func<string, IAccessSource>? sourceFactory = null,
-        TextWriter? output = null, TextWriter? error = null)
+        TextWriter? output = null, TextWriter? error = null, IWindowsServiceStatus? serviceStatus = null)
     {
         var o = output ?? Console.Out;
         var e = error ?? Console.Error;
-        import.AddCommand(Access(provider, sourceFactory ?? (cs => new NpgsqlAccessSource(cs)), o, e));
+        import.AddCommand(Access(provider, sourceFactory ?? (cs => new NpgsqlAccessSource(cs)), o, e,
+            serviceStatus ?? (OperatingSystem.IsWindows() ? new WindowsServiceStatus() : null)));
     }
 
     /// <summary>Пароль из переменной окружения подставляется, только если в строке его нет.</summary>
@@ -29,7 +34,8 @@ public static class ImportCommands
         return builder.ConnectionString;
     }
 
-    private static Command Access(IServiceProvider provider, Func<string, IAccessSource> sourceFactory, TextWriter output, TextWriter error)
+    private static Command Access(IServiceProvider provider, Func<string, IAccessSource> sourceFactory, TextWriter output, TextWriter error,
+        IWindowsServiceStatus? serviceStatus)
     {
         var connectionOpt = new Option<string>("--connection",
             $"Строка подключения Npgsql к БД Access (Host=…;Database=…;Username=…); пароль — в строке или в {PasswordVariable}")
@@ -38,8 +44,9 @@ public static class ImportCommands
         var auditOpt = new Option<bool>("--audit", "Перенести журнал audit_log");
         var overwriteOpt = new Option<bool>("--overwrite", "Заменять уже заданные в WinAdmin значения");
         var passwordOpt = new Option<bool>("--import-service-password", "Перенести пароль служебной учётки AD (в Access — открытым текстом)");
+        var forceOpt = new Option<bool>("--force", $"Импортировать, даже если служба {ServiceName} не остановлена (она может затереть импорт)");
         var cmd = new Command("access", "Импорт настроек, ролей и журнала из портала Access (PostgreSQL)")
-            { connectionOpt, applyOpt, auditOpt, overwriteOpt, passwordOpt };
+            { connectionOpt, applyOpt, auditOpt, overwriteOpt, passwordOpt, forceOpt };
         cmd.SetHandler(async (InvocationContext ctx) =>
         {
             var p = ctx.ParseResult;
@@ -55,6 +62,21 @@ public static class ImportCommands
                 error.WriteLine($"Неверная строка подключения: {ex.Message}");
                 ctx.ExitCode = 1;
                 return;
+            }
+
+            // Служба держит настройки AD и модулей в памяти и при следующем сохранении затёрла бы импорт.
+            if (options.Apply && !p.GetValueForOption(forceOpt) && serviceStatus is not null)
+            {
+                var state = serviceStatus.GetState(ServiceName);
+                if (state is not (WindowsServiceState.Stopped or WindowsServiceState.NotInstalled))
+                {
+                    error.WriteLine(state == WindowsServiceState.Unknown
+                        ? $"Не удалось узнать состояние службы {ServiceName} (нужны права администратора). "
+                        : $"Служба {ServiceName} не остановлена (состояние: {state}) — она держит настройки в памяти и затрёт импорт. ");
+                    error.WriteLine($"Остановите службу (Stop-Service {ServiceName}) и повторите команду; импорт без остановки — --force. Ничего не изменено.");
+                    ctx.ExitCode = 1;
+                    return;
+                }
             }
 
             var source = sourceFactory(connection);
@@ -79,6 +101,14 @@ public static class ImportCommands
                 return;
             }
             Print(report, output);
+            if (report.Error is not null)
+            {
+                error.WriteLine($"Импорт прерван ошибкой и выполнен частично: {report.Error}");
+                error.WriteLine("Строки «Создано» выше уже применены, «Ошибка» — на чём прервалось; роли и назначения " +
+                                "применяются одной транзакцией и при сбое откатываются. Устраните причину и повторите команду — " +
+                                "уже перенесённое будет пропущено. Итог записан в журнал (import.access).");
+                ctx.ExitCode = 1;
+            }
         });
         return cmd;
     }

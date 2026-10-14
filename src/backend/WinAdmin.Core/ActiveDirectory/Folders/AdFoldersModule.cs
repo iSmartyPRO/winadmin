@@ -31,6 +31,7 @@ public sealed class AdFoldersModule : IWinAdminModule, IModuleLifecycle
 {
     public const string ModuleId = "ad-folders";
     public const string AdminRoleName = "AD: администраторы папок";
+    public const string MembersRoleName = "AD: папки — участники";
 
     public string Id => ModuleId;
     public string Title => "Папки";

@@ -23,6 +23,9 @@ public static class AdRoleTemplates
     [
         new(AdFoldersModule.AdminRoleName, "Шаблон: все действия с папками",
             [new(PermissionIds.AdFoldersRead, null), new(PermissionIds.AdFoldersMembership, null), new(PermissionIds.AdFoldersCreate, null)]),
+        // Права роли admin/super_admin портала Access: просмотр папок и участники — без создания папок и прав NTFS.
+        new(AdFoldersModule.MembersRoleName, "Шаблон: просмотр папок и участники Full/Read (без создания папок)",
+            [new(PermissionIds.AdFoldersRead, null), new(PermissionIds.AdFoldersMembership, null)]),
     ];
 
     public static IReadOnlyList<SaveRoleRequest> All { get; } = [.. Users, .. Folders];
