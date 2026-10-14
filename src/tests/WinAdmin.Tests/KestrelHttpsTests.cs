@@ -57,7 +57,7 @@ public sealed class KestrelHttpsTests : IAsyncLifetime
             new HttpsSettings(true, new HttpsCertificateSettings(HttpsCertificateSource.Store, _cert.Thumbprint), redirect));
 
     [Fact]
-    public async Task Enabling_https_rebinds_with_certificate_http1_hsts_and_redirect()
+    public async Task Enabling_https_rebinds_with_certificate_http1_and_redirect_without_hsts()
     {
         int port = FreePort(), redirect = FreePort();
         _store.Write(HttpsSettings(port, redirect));
@@ -76,7 +76,8 @@ public sealed class KestrelHttpsTests : IAsyncLifetime
         Assert.Equal(HttpVersion.Version11, response!.Version);
         Assert.Equal("ok HTTP/1.1", await response.Content.ReadAsStringAsync());
         Assert.Equal(_cert.Thumbprint, _seen?.Thumbprint);
-        Assert.Equal("max-age=31536000", response.Headers.GetValues("Strict-Transport-Security").Single());
+        // HSTS действует на всё имя хоста, а не на порт: на нестандартном порту его нет.
+        Assert.False(response.Headers.Contains("Strict-Transport-Security"));
 
         // HTTP-порт перенаправления: 308 на тот же путь по HTTPS, без HSTS.
         var redirected = await TryAsync(new HttpRequestMessage(HttpMethod.Post, $"http://127.0.0.1:{redirect}/api/v1/x?y=1"));
@@ -155,6 +156,35 @@ public sealed class HttpsRedirectTests
     [InlineData(false, 0)]     // TestServer
     public void Other_requests_are_not_redirected(bool isHttps, int localPort)
         => Assert.Null(HttpsRedirect.Location(Https, isHttps, localPort, new HostString("srv01"), PathString.Empty, new PathString("/"), QueryString.Empty));
+
+    [Fact]
+    public void Hsts_is_sent_only_for_https_on_port_443_and_for_one_day()
+    {
+        var on443 = Https with { Port = 443 };
+        Assert.Equal("max-age=86400", HttpsRedirect.Hsts(on443, isHttps: true));
+        Assert.Null(HttpsRedirect.Hsts(on443, isHttps: false));
+        // HSTS привязан к имени хоста, а не к порту (RFC 6797 §8.3): на 8443 он сломал бы порт перенаправления
+        // и другие HTTP-сайты сервера.
+        Assert.Null(HttpsRedirect.Hsts(Https, isHttps: true));
+        Assert.Null(HttpsRedirect.Hsts(on443 with { Https = on443.Https! with { Enabled = false } }, isHttps: true));
+    }
+
+    [Theory]
+    [InlineData(443, true)]
+    [InlineData(8443, false)]
+    public async Task Middleware_sends_hsts_only_on_port_443(int port, bool expected)
+    {
+        var loader = new Moq.Mock<WinAdmin.Core.Abstractions.IHttpsCertificateLoader>();
+        loader.Setup(l => l.Load(Moq.It.IsAny<HttpsCertificateSettings>())).Returns(new WinAdmin.Core.Abstractions.CertificateLoadResult(null, "нет"));
+        var holder = new HttpsCertificateHolder(loader.Object);
+        holder.Update(Https with { Port = port });
+        var context = new DefaultHttpContext();
+        context.Request.IsHttps = true;
+
+        await new HttpsRedirectMiddleware(_ => Task.CompletedTask, holder).InvokeAsync(context);
+
+        Assert.Equal(expected, context.Response.Headers.ContainsKey("Strict-Transport-Security"));
+    }
 
     [Fact]
     public void Disabled_https_never_redirects()

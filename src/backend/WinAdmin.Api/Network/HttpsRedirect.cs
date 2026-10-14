@@ -3,10 +3,20 @@ using WinAdmin.Core.Network;
 
 namespace WinAdmin.Api.Network;
 
-/// <summary>Перенаправление с HTTP-порта на HTTPS (308) и HSTS для HTTPS-ответов.</summary>
+/// <summary>Перенаправление с HTTP-порта на HTTPS (308) и HSTS для HTTPS-ответов на порту 443.</summary>
 public static class HttpsRedirect
 {
-    public const string HstsValue = "max-age=31536000";
+    /// <summary>Сутки: после выключения HTTPS браузеры быстро «забудут» принудительный https://.</summary>
+    public const string HstsValue = "max-age=86400";
+
+    /// <summary>
+    /// Значение заголовка HSTS или null. HSTS действует на всё имя хоста, а не на порт (RFC 6797 §8.3):
+    /// при HTTPS на нестандартном порту браузер переписал бы http://srv:8080 (порт перенаправления) и
+    /// другие HTTP-сайты сервера (IIS:80) на https:// — поэтому только для основного порта 443.
+    /// Без includeSubDomains: панель не отвечает за другие сайты домена.
+    /// </summary>
+    public static string? Hsts(NetworkSettings settings, bool isHttps)
+        => isHttps && settings.HttpsEnabled && settings.Port == 443 ? HstsValue : null;
 
     /// <summary>
     /// Адрес для 308 или null. Перенаправляется только запрос без TLS, пришедший на порт перенаправления
@@ -24,7 +34,7 @@ public static class HttpsRedirect
     }
 }
 
-/// <summary>Первым в конвейере: 308 с порта перенаправления, заголовок HSTS на HTTPS.</summary>
+/// <summary>Первым в конвейере: 308 с порта перенаправления, заголовок HSTS на HTTPS (только порт 443).</summary>
 public sealed class HttpsRedirectMiddleware(RequestDelegate next, HttpsCertificateHolder holder)
 {
     public Task InvokeAsync(HttpContext context)
@@ -32,8 +42,8 @@ public sealed class HttpsRedirectMiddleware(RequestDelegate next, HttpsCertifica
         var request = context.Request;
         if (request.IsHttps)
         {
-            // Без includeSubDomains: панель не отвечает за другие сайты домена.
-            context.Response.Headers.StrictTransportSecurity = HttpsRedirect.HstsValue;
+            if (HttpsRedirect.Hsts(holder.Settings, isHttps: true) is string hsts)
+                context.Response.Headers.StrictTransportSecurity = hsts;
             return next(context);
         }
 
