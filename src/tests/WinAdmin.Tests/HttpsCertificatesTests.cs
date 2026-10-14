@@ -37,7 +37,12 @@ public sealed class FakeCertificateStore : ICertificateStore
     public List<(CertificateStoreLocation Location, X509Certificate2 Certificate)> Items { get; } = [];
 
     public X509Certificate2? Find(CertificateStoreLocation location, string thumbprint)
-        => Items.Where(i => i.Location == location && i.Certificate.Thumbprint == thumbprint).Select(i => i.Certificate).FirstOrDefault();
+        // Как X509Store: каждый раз новый экземпляр (вызывающий его освобождает).
+        => Items.Where(i => i.Location == location && i.Certificate.Thumbprint == thumbprint)
+            .Select(i => i.Certificate.HasPrivateKey
+                ? X509CertificateLoader.LoadPkcs12(i.Certificate.Export(X509ContentType.Pfx), null, X509KeyStorageFlags.Exportable)
+                : X509CertificateLoader.LoadCertificate(i.Certificate.RawData))
+            .FirstOrDefault();
 
     public IReadOnlyList<(CertificateStoreLocation Location, X509Certificate2 Certificate)> List() => Items;
 }

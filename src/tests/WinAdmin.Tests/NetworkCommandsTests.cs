@@ -104,4 +104,95 @@ public sealed class NetworkCommandsTests : IDisposable
         Assert.DoesNotContain("   at ", _err.ToString()); // без стектрейса
         Assert.Equal(NetworkMode.Local, _store.ReadOrDefault(out _).Mode);
     }
+
+    // ── network https ────────────────────────────────────────────
+
+    [Fact]
+    public async Task Https_show_reports_disabled()
+    {
+        Assert.Equal(0, await _root.InvokeAsync(["network", "https", "--show"]));
+        Assert.Contains("HTTPS:", _out.ToString());
+        Assert.Contains("выключен", _out.ToString());
+    }
+
+    [Fact]
+    public async Task Https_enable_with_store_thumbprint()
+    {
+        var cert = TestCertificates.Valid("srv01.corp.local");
+        _certs.Items.Add((CertificateStoreLocation.LocalMachine, cert));
+
+        int code = await _root.InvokeAsync(["network", "https", "--enable", "--thumbprint", cert.Thumbprint.ToLowerInvariant()]);
+
+        Assert.Equal(0, code);
+        var s = _store.ReadOrDefault(out _);
+        Assert.True(s.HttpsEnabled);
+        Assert.Equal(cert.Thumbprint, s.Https!.Certificate!.Thumbprint);
+        Assert.Equal(CertificateStoreLocation.LocalMachine, s.Https.Certificate.StoreLocation);
+        Assert.Contains("https://127.0.0.1:8080", _out.ToString());
+
+        _out.GetStringBuilder().Clear();
+        Assert.Equal(0, await _root.InvokeAsync(["network", "https", "--show"]));
+        Assert.Contains(cert.Thumbprint, _out.ToString());
+        Assert.Contains("действует до", _out.ToString());
+    }
+
+    [Fact]
+    public async Task Https_enable_with_unknown_thumbprint_fails_without_changes()
+    {
+        int code = await _root.InvokeAsync(["network", "https", "--enable", "--thumbprint", new string('D', 40)]);
+        Assert.Equal(1, code);
+        Assert.Contains("не найден", _err.ToString());
+        Assert.False(_store.ReadOrDefault(out _).HttpsEnabled);
+    }
+
+    [Fact]
+    public async Task Https_enable_with_pfx_encrypts_password_and_sets_redirect()
+    {
+        using var cert = TestCertificates.Valid("srv01.corp.local");
+        string pfx = Path.Combine(_dir, "panel.pfx");
+        File.WriteAllBytes(pfx, cert.Export(System.Security.Cryptography.X509Certificates.X509ContentType.Pfx, "Cli-Secret-7"));
+
+        int code = await _root.InvokeAsync(["network", "https", "--enable", "--pfx", pfx, "--pfx-password", "Cli-Secret-7", "--redirect-port", "8081"]);
+
+        Assert.Equal(0, code);
+        string json = File.ReadAllText(_store.FilePath);
+        Assert.DoesNotContain("Cli-Secret-7", json);
+        Assert.Contains("enc:v1:", json);
+        Assert.Equal(8081, _store.ReadOrDefault(out _).Https!.HttpRedirectPort);
+        Assert.DoesNotContain("Cli-Secret-7", _out.ToString());
+    }
+
+    [Fact]
+    public async Task Https_enable_self_signed_generates_certificate_with_extra_dns()
+    {
+        int code = await _root.InvokeAsync(["network", "https", "--enable", "--self-signed", "--dns", "panel.corp.local"]);
+
+        Assert.Equal(0, code);
+        Assert.True(File.Exists(Path.Combine(_dir, "keys", "https.pfx")));
+        var s = _store.ReadOrDefault(out _);
+        Assert.Equal(HttpsCertificateSource.SelfSigned, s.Https!.Certificate!.Source);
+        Assert.Contains("panel.corp.local", _out.ToString());
+    }
+
+    [Fact]
+    public async Task Https_disable_keeps_certificate_choice()
+    {
+        await _root.InvokeAsync(["network", "https", "--enable", "--self-signed"]);
+        int code = await _root.InvokeAsync(["network", "https", "--disable"]);
+
+        Assert.Equal(0, code);
+        var s = _store.ReadOrDefault(out _);
+        Assert.False(s.HttpsEnabled);
+        Assert.Equal(HttpsCertificateSource.SelfSigned, s.Https!.Certificate!.Source);
+        Assert.Contains("http://127.0.0.1:8080", _out.ToString());
+    }
+
+    [Fact]
+    public async Task Https_conflicting_options_exit_1()
+    {
+        Assert.Equal(1, await _root.InvokeAsync(["network", "https", "--enable", "--disable"]));
+        Assert.Equal(1, await _root.InvokeAsync(["network", "https", "--enable", "--self-signed", "--thumbprint", new string('A', 40)]));
+        Assert.Equal(1, await _root.InvokeAsync(["network", "https", "--enable", "--thumbprint", new string('A', 40), "--store", "Nowhere"]));
+        Assert.False(_store.ReadOrDefault(out _).HttpsEnabled);
+    }
 }
