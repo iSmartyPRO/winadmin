@@ -66,6 +66,34 @@ public sealed class HttpsSettingsTests : IDisposable
         Assert.Contains(errors, e => e.Contains("PFX"));
     }
 
+    // Служба (LocalSystem) по UNC-пути аутентифицировалась бы на чужом SMB-сервере (NTLM relay),
+    // а ответ «файл не найден» превращал бы проверку в оракул существования файлов.
+    [Theory]
+    [InlineData(@"\\attacker\s\x.pfx")]
+    [InlineData(@"//attacker/s/x.pfx")]
+    [InlineData(@"\\?\UNC\attacker\s\x.pfx")]
+    [InlineData(@"\\?\C:\certs\panel.pfx")]
+    [InlineData(@"\\.\C:\certs\panel.pfx")]
+    [InlineData(@"\\.\pipe\panel")]
+    [InlineData(@"\??\C:\certs\panel.pfx")]
+    public void Pfx_path_must_be_on_a_local_drive(string path)
+    {
+        var https = new HttpsSettings(true, new HttpsCertificateSettings(HttpsCertificateSource.Pfx, Path: path));
+        var (_, errors) = NetworkSettingsValidator.Normalize(With(https));
+        Assert.Contains(errors, e => e.Contains("PFX"));
+    }
+
+    [Theory]
+    [InlineData(@"C:\certs\panel.pfx")]
+    [InlineData(@"d:\panel.pfx")]
+    public void Pfx_path_on_drive_letter_is_accepted(string path)
+    {
+        Assert.True(NetworkSettingsValidator.IsLocalDrivePath(path));
+        var https = new HttpsSettings(true, new HttpsCertificateSettings(HttpsCertificateSource.Pfx, Path: path));
+        var (_, errors) = NetworkSettingsValidator.Normalize(With(https));
+        Assert.Empty(errors);
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(70000)]

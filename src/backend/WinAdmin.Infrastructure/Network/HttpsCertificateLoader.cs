@@ -83,7 +83,12 @@ public sealed class HttpsCertificateLoader(
 
     private CertificateLoadResult FromPfx(string? path, string? protectedPassword, string purpose, string notFound)
     {
-        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        if (string.IsNullOrWhiteSpace(path))
+            return new(null, notFound);
+        // До любого обращения к файлу: по UNC-пути LocalSystem аутентифицировался бы на чужом сервере.
+        if (!NetworkSettingsValidator.IsLocalDrivePath(path))
+            return new(null, $"Файл PFX должен лежать на локальном диске сервера (путь вида C:\\certs\\panel.pfx): {path}");
+        if (!File.Exists(path))
             return new(null, notFound);
 
         string? password = null;

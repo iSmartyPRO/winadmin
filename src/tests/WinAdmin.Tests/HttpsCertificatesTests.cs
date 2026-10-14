@@ -209,6 +209,26 @@ public sealed class HttpsCertificatesTests : IDisposable
     }
 
     [Fact]
+    public void Pfx_outside_local_drive_is_refused_before_touching_the_file()
+    {
+        // Настоящий файл, доступный через префиксы \\?\ и \\.\ — загрузчик не должен его открыть.
+        Directory.CreateDirectory(_dir);
+        using var cert = TestCertificates.Valid();
+        string pfx = Path.GetFullPath(Path.Combine(_dir, "panel.pfx"));
+        File.WriteAllBytes(pfx, cert.Export(X509ContentType.Pfx, "P@ss-1"));
+        var settings = new HttpsCertificateSettings(HttpsCertificateSource.Pfx, Path: pfx,
+            Password: _protector.Protect("P@ss-1", HttpsCertificateLoader.PfxPasswordPurpose));
+        Assert.NotNull(_loader.Load(settings).Certificate);
+
+        foreach (string path in new[] { @"\\?\" + pfx, @"\\.\" + pfx, @"\\127.0.0.1\winadmin-missing$\panel.pfx", @"\\?\UNC\127.0.0.1\winadmin-missing$\panel.pfx" })
+        {
+            var result = _loader.Load(settings with { Path = path });
+            Assert.Null(result.Certificate);
+            Assert.Contains("локальном диске", result.Error);
+        }
+    }
+
+    [Fact]
     public void Self_signed_is_saved_to_keys_with_encrypted_password_and_loaded_back()
     {
         var info = _loader.CreateSelfSigned(["srv01.corp.local", "localhost"]);

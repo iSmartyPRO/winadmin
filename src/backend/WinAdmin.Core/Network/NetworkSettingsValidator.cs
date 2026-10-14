@@ -49,6 +49,16 @@ public static class NetworkSettingsValidator
                 .ToArray())
             .ToUpperInvariant();
 
+    /// <summary>
+    /// Полный путь на диске с буквой (<c>X:\...</c>). Отсекает UNC (<c>\\сервер\...</c>, <c>//сервер/...</c>) и
+    /// пространства имён устройств (<c>\\?\</c>, <c>\\.\</c>, <c>\??\</c>): служба работает от LocalSystem,
+    /// и по сетевому пути она аутентифицировалась бы на чужом SMB-сервере (NTLM relay).
+    /// </summary>
+    public static bool IsLocalDrivePath(string? path)
+        => path is { Length: >= 3 }
+            && char.IsAsciiLetter(path[0]) && path[1] == ':' && (path[2] == '\\' || path[2] == '/')
+            && System.IO.Path.IsPathFullyQualified(path);
+
     private static HttpsSettings? NormalizeHttps(HttpsSettings? https, int port, List<string> errors)
     {
         // Выключенный HTTPS хранится как есть (чтобы переключение туда-обратно не теряло сертификат).
@@ -73,6 +83,8 @@ public static class NetworkSettingsValidator
                 string path = cert.Path?.Trim() ?? "";
                 if (path.Length == 0 || !System.IO.Path.IsPathFullyQualified(path))
                     errors.Add("Укажите полный путь к файлу PFX (например C:\\certs\\panel.pfx).");
+                else if (!IsLocalDrivePath(path))
+                    errors.Add("Файл PFX должен лежать на локальном диске сервера (путь вида C:\\certs\\panel.pfx); сетевые пути и пути устройств не поддерживаются.");
                 cert = cert with { Path = path, Thumbprint = null, StoreLocation = null };
                 break;
             case HttpsCertificateSource.SelfSigned:

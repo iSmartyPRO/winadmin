@@ -197,7 +197,7 @@ public static class NetworkCommands
                     "личное хранилище администратора. Импортируйте сертификат с закрытым ключом в LocalMachine\\My " +
                     "(certlm.msc → Личное) и укажите --store LocalMachine.";
             case { Source: HttpsCertificateSource.Pfx, Path: { Length: > 0 } path }:
-                if (path.StartsWith(@"\\", StringComparison.Ordinal) || path.StartsWith("//", StringComparison.Ordinal))
+                if (!NetworkSettingsValidator.IsLocalDrivePath(path))
                     return $"Файл PFX должен лежать на локальном диске сервера (например C:\\certs\\panel.pfx), а не по сетевому пути: {path}";
                 string? root = Path.GetPathRoot(path);
                 if (!string.IsNullOrEmpty(root) && (driveType ?? DriveTypeOf)(root) == DriveType.Network)
