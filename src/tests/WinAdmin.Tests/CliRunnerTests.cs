@@ -42,6 +42,15 @@ public sealed class CliRunnerTests : IDisposable
     }
 
     [Fact]
+    public async Task Import_access_with_unreachable_postgres_fails_cleanly()
+    {
+        int code = await Run("import", "access", "--connection", "Host=127.0.0.1;Port=1;Database=access;Username=u;Timeout=2");
+
+        Assert.Equal(1, code);
+        Assert.Contains("Не удалось прочитать БД Access", _err.ToString());
+    }
+
+    [Fact]
     public async Task Keys_import_recovers_from_unreadable_key()
     {
         Directory.CreateDirectory(KeysDir);
