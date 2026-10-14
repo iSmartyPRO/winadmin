@@ -6,7 +6,7 @@ import type {
   SystemInfo, SystemMetrics, PowerRequest, UserDto,
   CreateUserRequest, TokenResponse,
   EventLogQueryParams, EventLogQueryResult,
-  ExcludedUserDto, NetworkSettingsDto, UpdateNetworkSettingsRequest,
+  ExcludedUserDto, NetworkSettingsDto, UpdateNetworkSettingsRequest, CertificateInfo,
   ModuleDto, PermissionGroupDto, PrincipalType, RoleAssignmentDto, RoleDto, SaveRoleRequest,
   InstalledApp, InstalledUpdate, SoftwareJob,
   DirectorySettings, DirectoryTestStep, DirectoryEntry,
@@ -202,6 +202,10 @@ export const api = {
     network: () => http.get<NetworkSettingsDto>('/settings/network').then((r) => r.data),
     updateNetwork: (req: UpdateNetworkSettingsRequest) =>
       http.put<{ url: string }>('/settings/network', req).then((r) => r.data),
+    certificates: () =>
+      http.get<CertificateInfo[]>('/settings/network/certificates').then((r) => r.data),
+    createSelfSigned: (dnsNames: string[]) =>
+      http.post<CertificateInfo>('/settings/network/https/self-signed', { dnsNames }).then((r) => r.data),
   },
 
   software: {
