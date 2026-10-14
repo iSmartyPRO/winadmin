@@ -67,4 +67,4 @@ npm --prefix web run dev
 
 См. также: [01-deploy-iis.md](01-deploy-iis.md) · [02-security.md](02-security.md) ·
 [03-api-reference.md](03-api-reference.md) · [04-integration-guides.md](04-integration-guides.md) ·
-[05-troubleshooting.md](05-troubleshooting.md)
+[05-troubleshooting.md](05-troubleshooting.md) · [06-access-migration.md](06-access-migration.md)

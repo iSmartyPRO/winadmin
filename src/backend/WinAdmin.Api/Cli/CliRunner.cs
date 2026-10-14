@@ -5,6 +5,9 @@ using WinAdmin.Core.Abstractions;
 using WinAdmin.Core.Modules;
 using WinAdmin.Infrastructure;
 using WinAdmin.Infrastructure.Access;
+using WinAdmin.Infrastructure.ActiveDirectory;
+using WinAdmin.Infrastructure.MachineInfo;
+using WinAdmin.Infrastructure.Modules;
 using WinAdmin.Infrastructure.Network;
 using WinAdmin.Infrastructure.Secrets;
 using WinAdmin.Infrastructure.Security;
@@ -31,13 +34,16 @@ public static class CliRunner
             var services = new ServiceCollection();
             services.AddSingleton(protector);
             services.AddSingleton(new PermissionCatalog(BuiltInModules.All));
-            if (args is ["user", ..] or ["role", ..])
+            bool needsDatabase = args is ["user", ..] or ["role", ..] or ["import", ..];
+            if (needsDatabase)
                 services.AddWinAdminDatabase(databaseStore.ResolveForUse(databaseStore.Read(dbPath)));
+            if (args is ["import", ..])
+                AddImportServices(services);
             services.AddScoped<IUserService, UserService>();
             services.AddWinAdminNetwork(new NetworkSettingsStore(dataDirectory));
             provider = services.BuildServiceProvider();
 
-            if (args is ["user", ..] or ["role", ..])
+            if (needsDatabase)
             {
                 using var scope = provider.CreateScope();
                 var db = scope.ServiceProvider.GetRequiredService<WinAdminDbContext>();
@@ -68,7 +74,23 @@ public static class CliRunner
         var roleCommand = new Command("role", "Роли WinAdmin");
         RoleCommands.Register(roleCommand, provider);
 
-        var root = new RootCommand("WinAdmin CLI") { userCommand, networkCommand, dbCommand, keysCommand, roleCommand };
+        var importCommand = new Command("import", "Импорт данных из других систем");
+        ImportCommands.Register(importCommand, provider);
+
+        var root = new RootCommand("WinAdmin CLI") { userCommand, networkCommand, dbCommand, keysCommand, roleCommand, importCommand };
         return await root.InvokeAsync(args);
+    }
+
+    /// <summary>Сервисы импорта из Access — те же, что у службы: роли, модули, структура AD, каталог.</summary>
+    private static void AddImportServices(IServiceCollection services)
+    {
+        services.AddSingleton<IAccessService, AccessService>();
+        services.AddScoped<IAuditService, AuditService>();
+        services.AddScoped<IRoleService, RoleService>();
+        services.AddSingleton<IMachineInfo, WmiMachineInfo>();
+        services.AddSingleton<IDirectorySettingsStore, DirectorySettingsStore>();
+        services.AddSingleton<IDirectoryService>(sp => new LdapDirectoryService(sp.GetRequiredService<IDirectorySettingsStore>()));
+        services.AddSingleton<IAdStructureStore, AdStructureStore>();
+        services.AddSingleton<IModuleRegistry, ModuleRegistry>();
     }
 }

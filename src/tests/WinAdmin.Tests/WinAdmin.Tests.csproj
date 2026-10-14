@@ -22,6 +22,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Копия install/schema.sql и install/migrate_v*.sql портала Access для теста чтения NpgsqlAccessSource. -->
+    <None Include="Resources\AccessSchema\*.sql" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\backend\WinAdmin.Core\WinAdmin.Core.csproj" />
     <ProjectReference Include="..\..\backend\WinAdmin.Infrastructure\WinAdmin.Infrastructure.csproj" />
     <ProjectReference Include="..\..\backend\WinAdmin.Api\WinAdmin.Api.csproj" />

@@ -219,3 +219,4 @@ wevtutil sl Security /rt:false
 - [docs/03-api-reference.md](docs/03-api-reference.md) — справочник API
 - [docs/04-integration-guides.md](docs/04-integration-guides.md) — примеры интеграции
 - [docs/05-troubleshooting.md](docs/05-troubleshooting.md) — диагностика
+- [docs/06-access-migration.md](docs/06-access-migration.md) — переход с портала Access: импорт и вывод из эксплуатации

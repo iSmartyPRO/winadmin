@@ -28,6 +28,9 @@ public sealed class LdapDirectoryService(IDirectorySettingsStore settingsStore, 
     public Task<DirectoryObject?> FindBySidAsync(string sid, CancellationToken ct = default)
         => FindOneAsync($"(objectSid={LdapFilter.Sid(sid)})", ct);
 
+    public Task<DirectoryObject?> FindByDnAsync(string dn, CancellationToken ct = default)
+        => FindOneAsync($"(&(distinguishedName={LdapFilter.Escape(DnUtils.Normalize(dn))})(|(&{UserFilter}){GroupFilter}))", ct);
+
     public async Task<IReadOnlyList<string>> GetTokenGroupsAsync(string userSid, CancellationToken ct = default)
     {
         var user = await FindBySidAsync(userSid, ct);

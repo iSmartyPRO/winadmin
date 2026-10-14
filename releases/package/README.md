@@ -251,6 +251,31 @@ Restart-Service WinAdmin
 3. «Проверка окружения» → «Папки»: быстрая — группы, сопоставление дисков, права учётки записи, файловый сервер;
    полная («Полная (с NTFS)») — ещё и права на каждой папке.
 
+## 5ж. Переход с портала Access
+
+Настройки AD, скрытые OU, OU уволенных, назначения ролей (`super_admin` → «Администратор»,
+`admin` → «AD: администраторы пользователей» + «AD: администраторы папок», `hr` → «AD: отдел кадров»)
+и при желании журнал переносятся из PostgreSQL Access одной командой. Сначала — только отчёт:
+
+```powershell
+Stop-Service WinAdmin
+$env:WINADMIN_ACCESS_PG_PASSWORD = Read-Host "Пароль PostgreSQL Access"
+.\WinAdmin.exe import access --connection "Host=pg01;Database=access;Username=access"
+```
+
+Проверьте отчёт («Конфликт» — значение в WinAdmin уже другое, заменить — `--overwrite`;
+«Не найдено в AD» — учётки/группы нет в домене), затем выполните импорт и запустите службу:
+
+```powershell
+.\WinAdmin.exe import access --connection "Host=pg01;Database=access;Username=access" --apply --audit --import-service-password
+Start-Service WinAdmin
+```
+
+Без `--apply` ничего не меняется; повторный запуск безопасен. Локальные учётки Access не переносятся
+(создайте заново `user add`). Затем включите модули «Пользователи AD» и «Папки», проверьте вход и роли,
+остановите сайт Access в IIS, сделайте бэкап PostgreSQL Access и удалите из него пароль adService.
+Подробно и чек-лист — `docs/06-access-migration.md` (в репозитории исходников).
+
 ---
 
 ## 6. Постоянные настройки (рекомендуется)
@@ -311,6 +336,7 @@ Self-contained exe можно запускать **без IIS** — это пр�
 .\WinAdmin.exe network show
 .\WinAdmin.exe network set --port 9090
 .\WinAdmin.exe network https --show
+.\WinAdmin.exe import access --connection "Host=pg01;Database=access;Username=access"   # отчёт импорта из Access (п. 5ж)
 ```
 
 ---
