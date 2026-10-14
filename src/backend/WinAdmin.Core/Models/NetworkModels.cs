@@ -62,3 +62,14 @@ public sealed record UpdateNetworkSettingsRequest(NetworkMode Mode, int Port, Li
 
 /// <summary>Результат изменения: новый адрес панели.</summary>
 public sealed record NetworkUpdateResult(string Url);
+
+/// <summary>Сведения о сертификате HTTPS (без секретов).</summary>
+public sealed record CertificateInfo(
+    string Thumbprint,
+    string Subject,
+    string Issuer,
+    IReadOnlyList<string> DnsNames,
+    DateTimeOffset NotBefore,
+    DateTimeOffset NotAfter,
+    bool HasPrivateKey,
+    CertificateStoreLocation? StoreLocation = null);
