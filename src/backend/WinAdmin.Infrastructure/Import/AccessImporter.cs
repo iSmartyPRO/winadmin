@@ -163,6 +163,7 @@ public sealed class AccessImporter(
 
         string login = ServiceLogin(app);
         bool loginMatches = false;
+        Step? replacedLogin = null;
         if (login.Length == 0)
             Add("Учётка записи", "app_settings.ad_service_username", to, ImportStatus.NotImported, "в Access не задана");
         else
@@ -174,11 +175,19 @@ public sealed class AccessImporter(
                 target = target with { WriteLogin = login };
                 loginMatches = true;
                 if (note is not null) _steps[^1].Row = _steps[^1].Row with { Note = Join(_steps[^1].Row.Note, note) };
+                if (!string.IsNullOrWhiteSpace(current.WriteLogin)) replacedLogin = _steps[^1];
             }
             else loginMatches = same;
         }
 
         string? newPassword = await PlanPasswordAsync(app, current, loginMatches, options, ct);
+        // Пароль прежней учётки к новой не относится: без переноса пароля из Access — сбросить, а не оставить чужой.
+        if (replacedLogin is not null && newPassword is null && current.HasWritePassword)
+        {
+            newPassword = "";
+            replacedLogin.Row = replacedLogin.Row with
+                { Note = Join(replacedLogin.Row.Note, "пароль сброшен — задайте в настройках (пароль прежней учётки к новой не относится)") };
+        }
         return (target, newPassword);
     }
 

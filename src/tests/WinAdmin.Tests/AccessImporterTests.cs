@@ -251,6 +251,36 @@ public sealed class AccessImporterTests : IDisposable
         Assert.Equal("other", (await Get<IAdStructureStore>().GetWriteCredentialAsync()).Password);
     }
 
+    [Fact]
+    public async Task Overwritten_login_without_imported_password_clears_old_password()
+    {
+        await Get<IAdStructureStore>().SaveAsync(AdStructureSettings.Default with { WriteLogin = @"GESCONS\svc-winadmin" }, "svc-old");
+
+        var dry = await RunAsync(new AccessImportOptions(Overwrite: true));
+        Assert.Contains("пароль сброшен", Row(dry, "Учётка записи").Note);
+        Assert.Equal("svc-old", (await Get<IAdStructureStore>().GetWriteCredentialAsync()).Password);
+
+        var report = await RunAsync(new AccessImportOptions(Apply: true, Overwrite: true));
+
+        Assert.Equal(ImportStatus.Created, Row(report, "Учётка записи").Status);
+        Assert.Contains("пароль сброшен", Row(report, "Учётка записи").Note);
+        var credential = await Get<IAdStructureStore>().GetWriteCredentialAsync();
+        Assert.Equal(@"GESCONS\access", credential.Login);
+        Assert.Null(credential.Password);
+        Assert.False((await Get<IAdStructureStore>().GetAsync()).HasWritePassword);
+    }
+
+    [Fact]
+    public async Task Overwritten_login_with_imported_password_gets_access_password()
+    {
+        await Get<IAdStructureStore>().SaveAsync(AdStructureSettings.Default with { WriteLogin = @"GESCONS\svc-winadmin" }, "svc-old");
+
+        var report = await RunAsync(new AccessImportOptions(Apply: true, Overwrite: true, ImportServicePassword: true));
+
+        Assert.DoesNotContain("пароль сброшен", Row(report, "Учётка записи").Note ?? "");
+        Assert.Equal(Secret, (await Get<IAdStructureStore>().GetWriteCredentialAsync()).Password);
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("ЗАМЕНИТЕ_НА_ПАРОЛЬ")]
