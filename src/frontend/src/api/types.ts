@@ -197,18 +197,58 @@ export interface ExcludedUserDto {
 
 export type NetworkMode = 'Local' | 'Network'
 
+export type HttpsCertificateSource = 'Store' | 'Pfx' | 'SelfSigned'
+export type CertificateStoreLocation = 'LocalMachine' | 'CurrentUser'
+
+export interface CertificateInfo {
+  thumbprint: string
+  subject: string
+  issuer: string
+  dnsNames: string[]
+  notBefore: string
+  notAfter: string
+  hasPrivateKey: boolean
+  storeLocation?: CertificateStoreLocation | null
+}
+
+export interface HttpsSettingsDto {
+  enabled: boolean
+  source?: HttpsCertificateSource | null
+  thumbprint?: string | null
+  storeLocation?: CertificateStoreLocation | null
+  pfxPath?: string | null
+  /** Пароль PFX наружу не отдаётся — только признак. */
+  pfxPasswordSet: boolean
+  httpRedirectPort?: number | null
+  certificate?: CertificateInfo | null
+  certificateError?: string | null
+}
+
 export interface NetworkSettingsDto {
   mode: NetworkMode
   port: number
   allow: string[]
   url: string
   firewallRule: boolean
+  https?: HttpsSettingsDto | null
+}
+
+export interface UpdateHttpsRequest {
+  enabled: boolean
+  source?: HttpsCertificateSource | null
+  thumbprint?: string | null
+  storeLocation?: CertificateStoreLocation | null
+  pfxPath?: string | null
+  /** null — оставить сохранённый пароль. */
+  pfxPassword?: string | null
+  httpRedirectPort?: number | null
 }
 
 export interface UpdateNetworkSettingsRequest {
   mode: NetworkMode
   port: number
   allow: string[]
+  https?: UpdateHttpsRequest
 }
 
 export type SoftwareJobType = 'UninstallApp' | 'UninstallUpdate' | 'RollbackUpdate'

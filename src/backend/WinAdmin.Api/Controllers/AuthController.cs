@@ -187,7 +187,8 @@ public sealed class AuthController(
         {
             HttpOnly = true,
             SameSite = SameSiteMode.Strict,
-            Secure = !HttpContext.RequestServices
+            // По HTTPS — всегда Secure; по HTTP — как раньше (в разработке без Secure).
+            Secure = Request.IsHttps || !HttpContext.RequestServices
                 .GetRequiredService<IWebHostEnvironment>().IsDevelopment(),
             MaxAge = TimeSpan.FromDays(30),
         });

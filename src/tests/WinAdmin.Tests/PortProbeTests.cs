@@ -26,4 +26,29 @@ public sealed class PortProbeTests
         }
         Assert.False(probe.IsInUse(port));
     }
+
+    [Fact]
+    public void Https_with_redirect_requires_both_ports()
+    {
+        var probe = new SystemPortProbe();
+        var main = new TcpListener(IPAddress.Loopback, 0);
+        main.Start();
+        int port = ((IPEndPoint)main.LocalEndpoint).Port;
+        var redirect = new TcpListener(IPAddress.Loopback, 0);
+        redirect.Start();
+        int redirectPort = ((IPEndPoint)redirect.LocalEndpoint).Port;
+        try
+        {
+            var https = new HttpsSettings(true, new HttpsCertificateSettings(HttpsCertificateSource.SelfSigned), redirectPort);
+            var settings = new NetworkSettings(NetworkMode.Local, port, [], https);
+            Assert.True(probe.IsListening(settings));
+            redirect.Stop();
+            Assert.False(probe.IsListening(settings));
+        }
+        finally
+        {
+            main.Stop();
+            redirect.Stop();
+        }
+    }
 }

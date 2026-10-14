@@ -15,6 +15,7 @@ public sealed class NetworkApplyWatchdogTests : IDisposable
     private readonly NetworkSettingsStore _store;
     private readonly Mock<IPortProbe> _probe = new();
     private readonly Mock<IAuditService> _audit = new();
+    private readonly Mock<ITlsProbe> _tls = new();
     private readonly NetworkApplyWatchdog _watchdog;
 
     private static readonly NetworkSettings Previous = new(NetworkMode.Local, 8080, []);
@@ -30,7 +31,7 @@ public sealed class NetworkApplyWatchdogTests : IDisposable
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["WinAdmin:Network:VerifyDelaySeconds"] = "0" })
             .Build();
-        _watchdog = new NetworkApplyWatchdog(network, _probe.Object, scopes, config, NullLogger<NetworkApplyWatchdog>.Instance);
+        _watchdog = new NetworkApplyWatchdog(network, _probe.Object, scopes, config, NullLogger<NetworkApplyWatchdog>.Instance, _tls.Object);
     }
 
     public void Dispose()
@@ -85,5 +86,38 @@ public sealed class NetworkApplyWatchdogTests : IDisposable
         await _watchdog.Schedule(Previous, Applied, "admin", null); // не должно бросить
 
         Assert.True(_store.ReadOrDefault(out _).IsEquivalentTo(Previous));
+    }
+
+    private static readonly NetworkSettings AppliedHttps = Applied with
+    {
+        Https = new HttpsSettings(true, new HttpsCertificateSettings(HttpsCertificateSource.SelfSigned)),
+    };
+
+    [Fact]
+    public async Task Https_without_tls_handshake_is_rolled_back()
+    {
+        // Порт слушается, но TLS не работает (например, сертификат не загрузился).
+        _store.Write(AppliedHttps);
+        _probe.Setup(p => p.IsListening(It.IsAny<NetworkSettings>())).Returns(true);
+        _tls.Setup(t => t.HandshakeAsync(9090, It.IsAny<CancellationToken>())).ReturnsAsync((string?)null);
+
+        await _watchdog.Schedule(Previous, AppliedHttps, "admin", null);
+
+        Assert.True(_store.ReadOrDefault(out _).IsEquivalentTo(Previous));
+        _audit.Verify(a => a.WriteAsync(It.Is<AuditEntryDto>(e => e.Action == "settings.network.rollback" && e.Details!.Contains("TLS")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Https_with_tls_handshake_is_kept()
+    {
+        _store.Write(AppliedHttps);
+        _probe.Setup(p => p.IsListening(It.IsAny<NetworkSettings>())).Returns(true);
+        _tls.Setup(t => t.HandshakeAsync(9090, It.IsAny<CancellationToken>())).ReturnsAsync("AB");
+
+        await _watchdog.Schedule(Previous, AppliedHttps, "admin", null);
+
+        Assert.True(_store.ReadOrDefault(out _).IsEquivalentTo(AppliedHttps));
+        _audit.VerifyNoOtherCalls();
     }
 }

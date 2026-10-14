@@ -54,6 +54,32 @@ public sealed class DirectoryLoginApiTests(NetworkApiFactory factory)
     }
 
     [Fact]
+    public async Task Ad_password_over_https_from_network_is_accepted_with_secure_cookie_and_hsts()
+    {
+        string sam = await AdUserWithAccessAsync();
+        var client = factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+        {
+            BaseAddress = new Uri("https://localhost"),
+            HandleCookies = false,
+        });
+        client.DefaultRequestHeaders.Add(TestRemoteIp.Header, "10.1.2.3");
+
+        var r = await Login(client, sam, "Ad-Pass-1");
+
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        string cookie = r.Headers.GetValues("Set-Cookie").Single(c => c.StartsWith("wa_refresh="));
+        Assert.Contains("secure", cookie, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("max-age=31536000", r.Headers.GetValues("Strict-Transport-Security").Single());
+    }
+
+    [Fact]
+    public async Task Plain_http_response_has_no_hsts()
+    {
+        var r = await factory.Loopback().GetAsync("/health");
+        Assert.False(r.Headers.Contains("Strict-Transport-Security"));
+    }
+
+    [Fact]
     public async Task Forwarded_header_does_not_make_request_loopback()
     {
         string sam = await AdUserWithAccessAsync();

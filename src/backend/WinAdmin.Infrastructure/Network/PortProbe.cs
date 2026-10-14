@@ -11,7 +11,7 @@ public interface IPortProbe
     /// <summary>Порт слушает кто-либо на любом адресе.</summary>
     bool IsInUse(int port);
 
-    /// <summary>Endpoint из настроек сейчас слушается.</summary>
+    /// <summary>Endpoint из настроек (и порт перенаправления HTTP, если задан) сейчас слушается.</summary>
     bool IsListening(NetworkSettings settings);
 }
 
@@ -22,7 +22,9 @@ public sealed class SystemPortProbe : IPortProbe
     public bool IsListening(NetworkSettings settings)
     {
         var address = NetworkEndpoints.BindAddress(settings);
-        return Listeners().Any(e => e.Port == settings.Port && e.Address.Equals(address));
+        var listeners = Listeners();
+        return new[] { settings.Port, NetworkEndpoints.RedirectPort(settings) }.OfType<int>()
+            .All(port => listeners.Any(e => e.Port == port && e.Address.Equals(address)));
     }
 
     private static IPEndPoint[] Listeners() => IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners();
