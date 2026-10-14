@@ -162,11 +162,12 @@ public sealed class AccessImporterTests : IDisposable
         Assert.Equal(
             new[]
             {
-                (AdFoldersModule.AdminRoleName, "AdUser", _ivanov.Sid),
+                (AdFoldersModule.MembersRoleName, "AdUser", _ivanov.Sid),
                 (AdUsersModule.AdminRoleName, "AdUser", _ivanov.Sid),
                 (AdUsersModule.HrRoleName, "AdGroup", _hr.Sid),
                 (AdUsersModule.HrRoleName, "AdUser", _petrov.Sid),
-                (BuiltInRoles.AdministratorName, "AdGroup", _admins.Sid),
+                (AdFoldersModule.MembersRoleName, "AdGroup", _admins.Sid),
+                (AdUsersModule.AdminRoleName, "AdGroup", _admins.Sid),
             }.Order(),
             assignments.Order());
         var summary = Assert.Single(Audit(), a => a.Action == "import.access");
@@ -174,9 +175,9 @@ public sealed class AccessImporterTests : IDisposable
 
         var again = await RunAsync(new AccessImportOptions(Apply: true));
         Assert.DoesNotContain(again.Rows, r => r.Status is ImportStatus.Created or ImportStatus.WillCreate or ImportStatus.Conflict);
-        Assert.Equal(5, (await AssignmentsAsync()).Count);
+        Assert.Equal(6, (await AssignmentsAsync()).Count);
         using var scope = _sp.CreateScope();
-        Assert.Equal(4, (await scope.ServiceProvider.GetRequiredService<IRoleService>().ListAsync()).Count);
+        Assert.Equal(5, (await scope.ServiceProvider.GetRequiredService<IRoleService>().ListAsync()).Count);
     }
 
     [Fact]
@@ -341,6 +342,40 @@ public sealed class AccessImporterTests : IDisposable
             new[] { (AdUsersModule.HrRoleName, "AdUser", _ivanov.Sid), (AdUsersModule.HrRoleName, "AdUser", _petrov.Sid) }.Order(),
             assignments.Order());
         Assert.DoesNotContain(assignments, a => a.Sid == namesake.Sid);
+    }
+
+    [Fact]
+    public async Task Imported_roles_grant_no_more_than_access_permission_cs()
+    {
+        // Access Permission.cs: admin и super_admin — users.* + folders.view/membership; hr — users.view/edit/move.
+        // Создавать папки в Access не мог никто; платформенных прав (весь сервер WinAdmin) в Access не было.
+        string[] usersAll = [PermissionIds.AdUsersRead, PermissionIds.AdUsersEdit, PermissionIds.AdUsersMove,
+            PermissionIds.AdUsersPassword, PermissionIds.AdUsersOffboard];
+        string[] adminSet = [.. usersAll, PermissionIds.AdFoldersRead, PermissionIds.AdFoldersMembership];
+        string[] hrSet = [PermissionIds.AdUsersRead, PermissionIds.AdUsersEdit, PermissionIds.AdUsersMove];
+
+        var report = await RunAsync(new AccessImportOptions(Apply: true));
+
+        using var scope = _sp.CreateScope();
+        var roleService = scope.ServiceProvider.GetRequiredService<IRoleService>();
+        var roles = (await roleService.ListAsync()).ToDictionary(r => r.Id);
+        var assignments = await roleService.ListAssignmentsAsync();
+        Assert.NotEmpty(assignments);
+        Assert.DoesNotContain(assignments, a => roles[a.RoleId].IsBuiltin);
+        foreach (var a in assignments)
+        {
+            var perms = roles[a.RoleId].Permissions.Select(p => p.PermissionId).ToList();
+            Assert.DoesNotContain(PermissionIds.AdFoldersCreate, perms);
+            Assert.DoesNotContain(perms, p => p.StartsWith("platform.", StringComparison.Ordinal));
+        }
+
+        string[] Effective(string sid) => [.. assignments.Where(a => a.PrincipalId == sid)
+            .SelectMany(a => roles[a.RoleId].Permissions.Select(p => p.PermissionId)).Distinct().Order()];
+        Assert.Equal(adminSet.Order(), Effective(_admins.Sid));   // super_admin
+        Assert.Equal(adminSet.Order(), Effective(_ivanov.Sid));   // admin
+        Assert.Equal(hrSet.Order(), Effective(_hr.Sid));          // hr
+        Assert.Contains("platform", Assert.Single(report.Rows, r => r.What.Contains("super_admin") && r.What.Contains("PortalAdmins")
+                                                                   && r.To.Contains(AdUsersModule.AdminRoleName)).Note);
     }
 
     [Fact]

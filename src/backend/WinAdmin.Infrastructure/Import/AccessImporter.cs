@@ -26,12 +26,21 @@ public sealed class AccessImporter(
     private const int AuditBatch = 500;
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
+    /// <summary>
+    /// Роли Access → шаблоны WinAdmin с теми же правами (Access Permission.cs): admin и super_admin — users.* +
+    /// folders.view/membership (создавать папки в Access не мог никто), hr — users.view/edit/move.
+    /// Платформенные права super_admin (portal_users, excluded_ous, audit) не переносятся: «Администратор» WinAdmin —
+    /// полный доступ ко всему серверу, его выдают вручную.
+    /// </summary>
     private static readonly Dictionary<string, string[]> RoleMap = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["super_admin"] = [BuiltInRoles.AdministratorName],
-        ["admin"] = [AdUsersModule.AdminRoleName, AdFoldersModule.AdminRoleName],
+        ["super_admin"] = [AdUsersModule.AdminRoleName, AdFoldersModule.MembersRoleName],
+        ["admin"] = [AdUsersModule.AdminRoleName, AdFoldersModule.MembersRoleName],
         ["hr"] = [AdUsersModule.HrRoleName],
     };
+
+    private const string SuperAdminNote = "права super_admin на управление порталом (portal_users, excluded_ous, audit) не переносятся — " +
+                                          "платформенные права (platform.*) или роль «Администратор» выдайте вручную";
 
     private sealed class Step(ImportRow row, Func<CancellationToken, Task>? action)
     {
@@ -325,7 +334,7 @@ public sealed class AccessImporter(
                 Add(what, from, string.Join(", ", targets.Select(t => $"«{t}»")), ImportStatus.NotFoundInAd, warning);
                 continue;
             }
-            PlanAssign(what, from, targets, found, existing, warning);
+            PlanAssign(what, from, targets, found, existing, RoleNote(p.RoleCode, warning));
         }
 
         foreach (var u in await source.GetPortalUsersAsync(ct))
@@ -349,7 +358,7 @@ public sealed class AccessImporter(
                 continue;
             }
             _portalUsers = true;
-            PlanAssign(what, from, targets, found, existing);
+            PlanAssign(what, from, targets, found, existing, RoleNote(u.RoleCode, null));
         }
     }
 
@@ -399,6 +408,9 @@ public sealed class AccessImporter(
             }, note);
         }
     }
+
+    private static string? RoleNote(string roleCode, string? note)
+        => string.Equals(roleCode, "super_admin", StringComparison.OrdinalIgnoreCase) ? Join(note, SuperAdminNote) : note;
 
     private static string Key(string role, PrincipalType type, string id) => $"{role}|{type}|{id}";
 
