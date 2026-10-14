@@ -9,7 +9,7 @@ using WinAdmin.Infrastructure.Secrets;
 namespace WinAdmin.Tests;
 
 /// <summary>Сертификаты для тестов — только в памяти (системные хранилища не трогаем).</summary>
-internal static class TestCertificates
+public static class TestCertificates
 {
     public static X509Certificate2 Create(string[] dns, DateTimeOffset notBefore, DateTimeOffset notAfter, string? eku = "1.3.6.1.5.5.7.3.1")
     {
@@ -32,7 +32,7 @@ internal static class TestCertificates
 }
 
 /// <summary>Хранилище «Личные» в памяти.</summary>
-internal sealed class FakeCertificateStore : ICertificateStore
+public sealed class FakeCertificateStore : ICertificateStore
 {
     public List<(CertificateStoreLocation Location, X509Certificate2 Certificate)> Items { get; } = [];
 

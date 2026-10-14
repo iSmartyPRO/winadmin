@@ -95,8 +95,10 @@ catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
 {
     StartupDiagnostics.Warn($"Не удалось создать {networkStore.FilePath}: {ex.Message}. Используется 127.0.0.1:{NetworkEndpoints.DefaultPort}.");
 }
-var networkSource = new NetworkConfigurationSource(networkStore);
-builder.Configuration.Sources.Add(networkSource);
+// HTTPS: сертификат загружается при каждом перечитывании network.json (до перепривязки Kestrel).
+var httpsHolder = new HttpsCertificateHolder(
+    new HttpsCertificateLoader(new SystemCertificateStore(), secretProtector, keysDirectory));
+var networkSource = builder.UseWinAdminNetwork(networkStore, httpsHolder);
 string? bootstrapKey = builder.Configuration["WinAdmin:BootstrapKey"];
 var corsOrigins = builder.Configuration.GetSection("WinAdmin:CorsOrigins").Get<string[]>() ?? [];
 
@@ -263,6 +265,9 @@ StartupDiagnostics.Flush(app.Logger);
 if (networkSource.Provider?.LastError is { } networkError)
     app.Logger.LogError("{File}: {Error}. Используются настройки по умолчанию (127.0.0.1:{Port}).",
         networkStore.FilePath, networkError, NetworkEndpoints.DefaultPort);
+httpsHolder.Logger = app.Services.GetRequiredService<ILogger<HttpsCertificateHolder>>();
+if (httpsHolder.Error is { } httpsError)
+    app.Logger.LogError("HTTPS включён, но сертификат не загружен: {Error}. Исправьте настройки или выключите HTTPS: WinAdmin.exe network https --disable", httpsError);
 
 if (WindowsServiceHelpers.IsWindowsService())
 {
@@ -287,6 +292,7 @@ if (WindowsServiceHelpers.IsWindowsService())
 }
 
 // ── Конвейер ────────────────────────────────────────────────────
+app.UseWinAdminHttps();
 app.UseSwagger();
 app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "WinAdmin API v1"));
 

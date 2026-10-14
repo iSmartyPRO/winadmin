@@ -32,6 +32,7 @@ public sealed class NetworkApiFactory : WebApplicationFactory<Program>
     public FakeAdReader AdReader { get; } = new();
     public FakeAdDomain AdDomain { get; } = new();
     public FakeNtfs Ntfs { get; } = new();
+    public FakeCertificateStore Certificates { get; } = new();
     public DirectorySettings DirectorySettings { get; set; } = new(true, "test.local", null, null, false);
 
     /// <summary>Клиент, чьи запросы сервер видит пришедшими с указанного адреса (только в тестах).</summary>
@@ -60,6 +61,8 @@ public sealed class NetworkApiFactory : WebApplicationFactory<Program>
         {
             services.RemoveAll<IFirewallRunner>();
             services.AddSingleton<IFirewallRunner>(Firewall);
+            services.RemoveAll<ICertificateStore>();
+            services.AddSingleton<ICertificateStore>(Certificates);
             services.RemoveAll<IPortProbe>();
             services.AddSingleton<IPortProbe>(new FakeProbe(BusyPorts));
             services.RemoveAll<IDirectoryService>();

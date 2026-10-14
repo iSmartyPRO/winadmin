@@ -6,6 +6,7 @@ namespace WinAdmin.Core.Network;
 public static class HttpsSettingsUpdate
 {
     /// <param name="protectPassword">Шифрует пароль PFX (открытым текстом в network.json он не попадает).</param>
+    [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(request))]
     public static HttpsSettings? Merge(UpdateHttpsRequest? request, HttpsSettings? previous, Func<string, string> protectPassword)
     {
         if (request is null) return previous;

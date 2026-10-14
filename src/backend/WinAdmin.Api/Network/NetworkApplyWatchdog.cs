@@ -16,11 +16,13 @@ public sealed class NetworkApplyWatchdog
     private readonly IServiceScopeFactory _scopes;
     private readonly IConfiguration _config;
     private readonly ILogger<NetworkApplyWatchdog> _logger;
+    private readonly ITlsProbe? _tls;
 
     public NetworkApplyWatchdog(
         INetworkSettingsService network, IPortProbe probe, IServiceScopeFactory scopes,
-        IConfiguration config, ILogger<NetworkApplyWatchdog> logger)
+        IConfiguration config, ILogger<NetworkApplyWatchdog> logger, ITlsProbe? tls = null)
     {
+        _tls = tls;
         _network = network;
         _probe = probe;
         _scopes = scopes;
@@ -33,16 +35,21 @@ public sealed class NetworkApplyWatchdog
         {
             int delay = _config.GetValue("WinAdmin:Network:VerifyDelaySeconds", 10);
             await Task.Delay(TimeSpan.FromSeconds(delay));
-            if (_probe.IsListening(applied))
+            string? failure = !_probe.IsListening(applied)
+                ? $"Не удалось начать прослушивание {NetworkEndpoints.ListenUrl(applied)}"
+                // «Порт слушается» не значит, что TLS работает: сертификат мог не загрузиться.
+                : applied.HttpsEnabled && _tls is not null && await _tls.HandshakeAsync(applied.Port, CancellationToken.None) is null
+                    ? $"TLS-рукопожатие с {NetworkEndpoints.ListenUrl(applied)} не удалось (сертификат не загружен?)"
+                    : null;
+            if (failure is null)
                 return;
             // За время ожидания настройки могли снова изменить (CLI, второй запрос) —
             // откатывать можно только то, что применяли сами.
             if (!_network.Current.IsEquivalentTo(applied))
                 return;
 
-            _logger.LogError("Панель не слушает {Url} после применения настроек — откат к {Previous}.",
-                NetworkEndpoints.ListenUrl(applied), NetworkEndpoints.ListenUrl(previous));
-            string details = $"Не удалось начать прослушивание {NetworkEndpoints.ListenUrl(applied)}; возвращено {NetworkEndpoints.ListenUrl(previous)}";
+            _logger.LogError("{Failure} — откат к {Previous}.", failure, NetworkEndpoints.ListenUrl(previous));
+            string details = $"{failure}; возвращено {NetworkEndpoints.ListenUrl(previous)}";
             try
             {
                 _network.Apply(previous, applied);
