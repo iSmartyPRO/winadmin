@@ -42,14 +42,23 @@ public sealed class AccessImporter(
     private const string SuperAdminNote = "права super_admin на управление порталом (portal_users, excluded_ous, audit) не переносятся — " +
                                           "платформенные права (platform.*) или роль «Администратор» выдайте вручную";
 
-    private sealed class Step(ImportRow row, Func<CancellationToken, Task>? action)
+    /// <summary>Как применяется строка: настройками группы <see cref="SettingsGroup"/>, своим действием в общей
+    /// транзакции ролей (<see cref="InRoleTransaction"/>) или своим действием отдельно (журнал).</summary>
+    private sealed class Step(ImportRow row, Func<CancellationToken, Task>? action, string? settingsGroup = null, bool inRoleTransaction = false)
     {
         public ImportRow Row { get; set; } = row;
         public Func<CancellationToken, Task>? Action { get; } = action;
+        public string? SettingsGroup { get; } = settingsGroup;
+        public bool InRoleTransaction { get; } = inRoleTransaction;
     }
 
+    private const string StructureGroup = "ad-structure";
+    private const string AdUsersGroup = "ad-users";
+
     private readonly List<Step> _steps = [];
-    private readonly List<Func<CancellationToken, Task>> _settingsActions = [];
+    private readonly List<(string Group, Func<CancellationToken, Task> Action)> _settingsActions = [];
+    private string? _group;
+    private string? _secret;
     private bool _portalUsers;
 
     /// <summary>«LDAP://host/OU=…,DC=…», «LDAP://OU=…» или DN → нормализованный DN; пусто — null.</summary>
@@ -70,8 +79,10 @@ public sealed class AccessImporter(
         _steps.Clear();
         _settingsActions.Clear();
         _portalUsers = false;
+        _group = StructureGroup;
 
         var app = await source.GetAppSettingsAsync(ct);
+        _secret = app?.ServicePassword;
         var current = await structure.GetAsync(ct);
         var target = current;
         string? newPassword = null;
@@ -85,10 +96,16 @@ public sealed class AccessImporter(
         {
             var save = target;
             var pwd = newPassword;
-            _settingsActions.Add(c => structure.SaveAsync(save, pwd, c));
+            _settingsActions.Add((StructureGroup, async c =>
+            {
+                await structure.SaveAsync(save, pwd, c);
+                await AuditStructureAsync(pwd, c);
+            }));
         }
 
+        _group = AdUsersGroup;
         await PlanAdUsersSettingsAsync(app, await source.GetTerminatedOusAsync(ct), options, ct);
+        _group = null;
         await PlanTemplatesAsync(ct);
         await PlanAssignmentsAsync(ct);
         await PlanLocalUsersAsync(ct);
@@ -97,28 +114,114 @@ public sealed class AccessImporter(
 
         var report = new AccessImportReport { Source = source.Description, Applied = options.Apply };
         if (options.Apply)
-        {
-            foreach (var action in _settingsActions)
-                await action(ct);
-            foreach (var step in _steps.Where(s => s.Action is not null))
-            {
-                await step.Action!(ct);
-                step.Row = step.Row with { Status = ImportStatus.Created };
-            }
-        }
+            report.Error = await ApplyAsync(ct);
         report.Rows.AddRange(_steps.Select(s => s.Row));
         AddHints(report, options);
 
         if (options.Apply)
         {
+            // Итог пишется всегда — и при сбое: по нему видно, что импорт прошёл частично и на чём прервался.
+            db.ChangeTracker.Clear();
             db.AuditEntries.Add(new AuditEntryEntity
             {
-                Actor = Actor, Action = "import.access", Target = source.Description, Success = true,
-                Details = report.Summary() + (options.Audit ? "; с журналом" : ""),
+                Actor = Actor, Action = "import.access", Target = source.Description, Success = report.Error is null,
+                Details = report.Summary() + (options.Audit ? "; с журналом" : "")
+                          + (report.Error is null ? "" : $"; выполнен частично, прерван ошибкой: {report.Error}"),
             });
-            await db.SaveChangesAsync(ct);
+            await db.SaveChangesAsync(CancellationToken.None);
         }
         return report;
+    }
+
+    // ── применение ───────────────────────────────────────────────
+
+    /// <summary>
+    /// Выполняет план. Настройки — по группам (каждая — своё сохранение), роли-шаблоны и назначения — одной транзакцией
+    /// БД (всё или ничего), журнал — порциями с отметкой (продолжается при повторном запуске). Любая ошибка не
+    /// выбрасывается: выполненные строки остаются «Создано», строка сбоя — «Ошибка», остальные — «не выполнено».
+    /// Возвращает текст ошибки (без стека и секретов) или null.
+    /// </summary>
+    private async Task<string?> ApplyAsync(CancellationToken ct)
+    {
+        Step? running = null;
+        try
+        {
+            foreach (var (group, action) in _settingsActions)
+            {
+                await action(ct);
+                MarkCreated(_steps.Where(s => s.SettingsGroup == group));
+            }
+
+            var roleSteps = _steps.Where(s => s.InRoleTransaction).ToList();
+            if (roleSteps.Count > 0)
+            {
+                await using var tx = await db.Database.BeginTransactionAsync(ct);
+                foreach (var step in roleSteps)
+                {
+                    running = step;
+                    await step.Action!(ct);
+                }
+                running = null;
+                await tx.CommitAsync(ct);
+                MarkCreated(roleSteps);
+            }
+
+            foreach (var step in _steps.Where(s => s.Action is not null && !s.InRoleTransaction))
+            {
+                running = step;
+                await step.Action!(ct);
+                running = null;
+                MarkCreated([step]);
+            }
+            return null;
+        }
+        catch (Exception ex)
+        {
+            string error = SafeMessage(ex);
+            if (running is not null)
+                running.Row = running.Row with { Status = ImportStatus.Failed, Note = Join(running.Row.Note, $"ошибка: {error}") };
+            foreach (var step in _steps.Where(s => s.Row.Status == ImportStatus.WillCreate))
+                step.Row = step.Row with
+                {
+                    Status = ImportStatus.NotImported,
+                    Note = Join(step.Row.Note, step.InRoleTransaction
+                        ? "не выполнено — роли и назначения применяются одной транзакцией, она откачена"
+                        : "не выполнено — импорт прерван ошибкой"),
+                };
+            return error;
+        }
+    }
+
+    private static void MarkCreated(IEnumerable<Step> steps)
+    {
+        foreach (var step in steps)
+            if (step.Row.Status == ImportStatus.WillCreate)
+                step.Row = step.Row with { Status = ImportStatus.Created };
+    }
+
+    /// <summary>Текст ошибки для отчёта и журнала: сообщения цепочки исключений в одну строку, без стека, пароль — «***».</summary>
+    private string SafeMessage(Exception ex)
+    {
+        var messages = new List<string>();
+        for (var e = ex; e is not null && messages.Count < 3; e = e.InnerException)
+            if (!messages.Contains(e.Message)) messages.Add(e.Message);
+        string text = string.Join(" → ", messages).ReplaceLineEndings(" ");
+        if (!string.IsNullOrEmpty(_secret)) text = text.Replace(_secret, "***", StringComparison.Ordinal);
+        return $"{ex.GetType().Name}: {text}";
+    }
+
+    /// <summary>Отдельная запись об изменении настроек AD (как «settings.ad» из интерфейса) — без пароля, только признак.</summary>
+    private async Task AuditStructureAsync(string? newPassword, CancellationToken ct)
+    {
+        var saved = await structure.GetAsync(ct);
+        string password = newPassword switch { null => "", "" => ", пароль сброшен", _ => ", пароль изменён" };
+        db.AuditEntries.Add(new AuditEntryEntity
+        {
+            Actor = Actor, Action = "settings.ad", Target = source.Description, Success = true,
+            Details = $"root={saved.RootOu}, users={saved.UsersOuName}, hidden=[{string.Join(", ", saved.HiddenOus)}], " +
+                      $"mode={saved.WriteMode}, login={saved.WriteLogin}{password}",
+        });
+        await db.SaveChangesAsync(ct);
     }
 
     // ── план ─────────────────────────────────────────────────────
@@ -126,8 +229,12 @@ public sealed class AccessImporter(
     private void Add(string what, string from, string to, ImportStatus status, string? note = null)
         => _steps.Add(new Step(new ImportRow(what, from, to, status, note), null));
 
-    private void Plan(string what, string from, string to, Func<CancellationToken, Task>? action, string? note = null)
-        => _steps.Add(new Step(new ImportRow(what, from, to, ImportStatus.WillCreate, note), action ?? (_ => Task.CompletedTask)));
+    /// <summary>Строка «Будет создано»: без действия — часть сохранения текущей группы настроек.</summary>
+    private void Plan(string what, string from, string to, Func<CancellationToken, Task>? action, string? note = null,
+        bool inRoleTransaction = false)
+        => _steps.Add(new Step(new ImportRow(what, from, to, ImportStatus.WillCreate, note), action,
+            action is null ? _group ?? throw new InvalidOperationException("строка без действия вне группы настроек") : null,
+            inRoleTransaction));
 
     /// <summary>Значение «уже задано»: пусто — записать; равно — пропуск; иначе конфликт / замена с Overwrite.</summary>
     private bool Decide(string what, string from, string to, string? existing, bool same, bool overwrite)
@@ -298,7 +405,7 @@ public sealed class AccessImporter(
         }
 
         if (changes.Count > 0)
-            _settingsActions.Add(c => modules.SaveSettingsAsync(AdUsersModule.ModuleId, changes, Actor, c));
+            _settingsActions.Add((AdUsersGroup, c => modules.SaveSettingsAsync(AdUsersModule.ModuleId, changes, Actor, c)));
     }
 
     private async Task PlanTemplatesAsync(CancellationToken ct)
@@ -310,7 +417,7 @@ public sealed class AccessImporter(
             if (existing.Contains(template.Name))
                 Add(what, "—", "Роли", ImportStatus.Exists);
             else
-                Plan(what, "—", "Роли", c => AdRoleTemplates.EnsureAsync(roles, catalog, [template], c));
+                Plan(what, "—", "Роли", c => AdRoleTemplates.EnsureAsync(roles, catalog, [template], c), inRoleTransaction: true);
         }
     }
 
@@ -405,7 +512,7 @@ public sealed class AccessImporter(
                 var role = (await roles.ListAsync(c)).Single(r => string.Equals(r.Name, roleName, StringComparison.CurrentCultureIgnoreCase));
                 await roles.AssignAsync(new CreateAssignmentRequest(role.Id, type, found.Sid, display),
                     AdRoleTemplates.SystemContext(catalog, Actor), c);
-            }, note);
+            }, note, inRoleTransaction: true);
         }
     }
 

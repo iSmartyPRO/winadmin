@@ -29,6 +29,7 @@ public sealed class AccessImporterTests : IDisposable
     private readonly FakeAccessSource _access = new();
     private readonly FakeDirectory _directory = new();
     private readonly DirectoryObject _admins, _hr, _ivanov, _petrov;
+    private int? _failAssignAt;
 
     public AccessImporterTests()
     {
@@ -39,7 +40,8 @@ public sealed class AccessImporterTests : IDisposable
             .AddSingleton(catalog)
             .AddSingleton(Mock.Of<IAccessService>())
             .AddScoped<IAuditService, AuditService>()
-            .AddScoped<IRoleService, RoleService>()
+            .AddScoped<RoleService>()
+            .AddScoped<IRoleService>(sp => new FailingRoleService(sp.GetRequiredService<RoleService>(), () => _failAssignAt))
             .AddSingleton<IDirectoryService>(_directory)
             .AddSingleton(Mock.Of<IMachineInfo>(m => m.IsDomainJoined == true))
             .AddSingleton<ISecretProtector>(new AesGcmSecretProtector(RandomNumberGenerator.GetBytes(32)))
@@ -429,6 +431,79 @@ public sealed class AccessImporterTests : IDisposable
         var last = await RunAsync(new AccessImportOptions(Apply: true, Audit: true));
         Assert.Equal(ImportStatus.Exists, Row(last, "Журнал аудита").Status);
         Assert.Equal(4, Audit().Count(a => a.Action.StartsWith("access.", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public async Task Failure_mid_apply_keeps_applied_rows_reports_error_and_writes_partial_audit()
+    {
+        _access.Audit.Add(new(1, DateTimeOffset.UtcNow, "ivanov", "user.move", "ad_user", "petrov", null));
+        _access.AuditError = new InvalidOperationException("связь с БД Access прервана");
+
+        var report = await RunAsync(new AccessImportOptions(Apply: true, Audit: true, ImportServicePassword: true));
+
+        Assert.NotNull(report.Error);
+        Assert.Contains("связь с БД Access прервана", report.Error);
+        Assert.Equal(ImportStatus.Failed, Row(report, "Журнал аудита").Status);
+        Assert.Equal(ImportStatus.Created, Row(report, "Корневая OU").Status);
+        Assert.Contains(report.Rows, r => r.What.Contains("Иванов") && r.Status == ImportStatus.Created);
+        Assert.Equal("OU=Accounts,DC=GESCONS,DC=RU", (await Get<IAdStructureStore>().GetAsync()).RootOu);
+        Assert.NotEmpty(await AssignmentsAsync());
+
+        var audit = Audit();
+        var summary = Assert.Single(audit, a => a.Action == "import.access");
+        Assert.False(summary.Success);
+        Assert.Contains("частично", summary.Details);
+        Assert.Contains("связь с БД Access прервана", summary.Details);
+        var structure = Assert.Single(audit, a => a.Action == "settings.ad");
+        Assert.Equal(AccessImporter.Actor, structure.Actor);
+        Assert.Contains("OU=Accounts,DC=GESCONS,DC=RU", structure.Details);
+        Assert.Contains(@"GESCONS\access", structure.Details);
+        Assert.Contains("пароль изменён", structure.Details);
+        Assert.DoesNotContain(audit, a => $"{a.Details}{a.Target}".Contains(Secret));
+        Assert.DoesNotContain(Secret, report.Error);
+    }
+
+    [Fact]
+    public async Task Failed_role_assignment_rolls_back_all_role_changes()
+    {
+        _failAssignAt = 3;
+
+        var report = await RunAsync(new AccessImportOptions(Apply: true));
+
+        Assert.Contains("сбой записи назначения", report.Error);
+        Assert.Empty(await AssignmentsAsync());
+        using (var scope = _sp.CreateScope())
+            Assert.Single(await scope.ServiceProvider.GetRequiredService<IRoleService>().ListAsync());
+        Assert.Single(report.Rows, r => r.Status == ImportStatus.Failed);
+        Assert.DoesNotContain(report.Rows, r => (r.What.StartsWith("Роль", StringComparison.Ordinal)
+                                                 || r.What.StartsWith("Пользователь портала", StringComparison.Ordinal))
+                                                && r.Status is ImportStatus.Created or ImportStatus.WillCreate);
+        // Настройки сохраняются отдельно от ролей и остаются применены.
+        Assert.Equal(ImportStatus.Created, Row(report, "Корневая OU").Status);
+        Assert.Equal("OU=Accounts,DC=GESCONS,DC=RU", (await Get<IAdStructureStore>().GetAsync()).RootOu);
+        var summary = Assert.Single(Audit(), a => a.Action == "import.access");
+        Assert.False(summary.Success);
+        Assert.Contains("частично", summary.Details);
+
+        _failAssignAt = null;
+        var again = await RunAsync(new AccessImportOptions(Apply: true));
+        Assert.Null(again.Error);
+        Assert.Equal(6, (await AssignmentsAsync()).Count);
+    }
+
+    [Fact]
+    public async Task Successful_apply_audits_structure_change_without_password()
+    {
+        var report = await RunAsync(new AccessImportOptions(Apply: true));
+
+        Assert.Null(report.Error);
+        var structure = Assert.Single(Audit(), a => a.Action == "settings.ad");
+        Assert.Contains(@"GESCONS\access", structure.Details);
+        Assert.DoesNotContain("пароль", structure.Details);
+        Assert.True(Assert.Single(Audit(), a => a.Action == "import.access").Success);
+
+        await RunAsync(new AccessImportOptions(Apply: true));
+        Assert.Single(Audit(), a => a.Action == "settings.ad");
     }
 
     [Fact]

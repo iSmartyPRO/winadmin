@@ -14,6 +14,10 @@ public sealed class FakeAccessSource : IAccessSource
     public List<AccessLocalUser> LocalUsers { get; } = [];
     public AccessExtras Extras { get; set; } = new(0, 0);
     public List<AccessAuditEntry> Audit { get; } = [];
+    /// <summary>Сбой чтения журнала (обрыв связи посреди импорта): бросается после <see cref="AuditReadsBeforeError"/> успешных чтений.</summary>
+    public Exception? AuditError { get; set; }
+    public int AuditReadsBeforeError { get; set; }
+    private int _auditReads;
 
     public Task<AccessAppSettings?> GetAppSettingsAsync(CancellationToken ct = default) => Task.FromResult(AppSettings);
     public Task<IReadOnlyList<string>> GetExcludedOusAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<string>>(ExcludedOus);
@@ -25,5 +29,7 @@ public sealed class FakeAccessSource : IAccessSource
     public Task<long> CountAuditAsync(long afterId, CancellationToken ct = default) => Task.FromResult((long)Audit.Count(a => a.Id > afterId));
 
     public Task<IReadOnlyList<AccessAuditEntry>> ReadAuditAsync(long afterId, int limit, CancellationToken ct = default)
-        => Task.FromResult<IReadOnlyList<AccessAuditEntry>>(Audit.Where(a => a.Id > afterId).OrderBy(a => a.Id).Take(limit).ToList());
+        => AuditError is not null && _auditReads++ >= AuditReadsBeforeError
+            ? throw AuditError
+            : Task.FromResult<IReadOnlyList<AccessAuditEntry>>(Audit.Where(a => a.Id > afterId).OrderBy(a => a.Id).Take(limit).ToList());
 }

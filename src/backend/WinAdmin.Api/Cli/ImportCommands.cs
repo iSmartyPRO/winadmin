@@ -79,6 +79,14 @@ public static class ImportCommands
                 return;
             }
             Print(report, output);
+            if (report.Error is not null)
+            {
+                error.WriteLine($"Импорт прерван ошибкой и выполнен частично: {report.Error}");
+                error.WriteLine("Строки «Создано» выше уже применены, «Ошибка» — на чём прервалось; роли и назначения " +
+                                "применяются одной транзакцией и при сбое откатываются. Устраните причину и повторите команду — " +
+                                "уже перенесённое будет пропущено. Итог записан в журнал (import.access).");
+                ctx.ExitCode = 1;
+            }
         });
         return cmd;
     }

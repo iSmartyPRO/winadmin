@@ -110,6 +110,23 @@ public sealed class ImportCommandsTests : IDisposable
     }
 
     [Fact]
+    public async Task Failure_during_apply_prints_applied_rows_and_error_without_stack_trace()
+    {
+        _access.Audit.Add(new(1, DateTimeOffset.UtcNow, "ivanov", "user.move", "ad_user", "petrov", null));
+        _access.AuditError = new InvalidOperationException("связь с БД Access прервана");
+
+        Assert.Equal(1, await Run("--apply", "--audit", "--import-service-password"));
+
+        string output = _out.ToString(), err = _err.ToString();
+        Assert.Contains("Создано", output);
+        Assert.Contains("Корневая OU", output);
+        Assert.Contains("связь с БД Access прервана", err);
+        Assert.Contains("частично", err);
+        Assert.DoesNotContain("   at ", output + err);
+        Assert.DoesNotContain(Secret, output + err);
+    }
+
+    [Fact]
     public async Task Connection_option_is_required()
         => Assert.NotEqual(0, await _root.InvokeAsync(["import", "access"]));
 
