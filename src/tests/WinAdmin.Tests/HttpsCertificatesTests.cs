@@ -250,6 +250,48 @@ public sealed class HttpsCertificatesTests : IDisposable
     }
 
     [Fact]
+    public async Task Concurrent_self_signed_generation_never_mixes_pfx_and_password()
+    {
+        var settings = new HttpsCertificateSettings(HttpsCertificateSource.SelfSigned);
+        _loader.CreateSelfSigned(["localhost"]);
+
+        var created = new System.Collections.Concurrent.ConcurrentBag<string>();
+        var readErrors = new System.Collections.Concurrent.ConcurrentBag<string>();
+        using var stop = new CancellationTokenSource();
+        using var start = new Barrier(6);
+
+        var writers = Enumerable.Range(0, 4).Select(_ => Task.Run(() =>
+        {
+            start.SignalAndWait();
+            for (int i = 0; i < 3; i++)
+                created.Add(_loader.CreateSelfSigned(["localhost"]).Thumbprint);
+        })).ToArray();
+        // Читатели (как Kestrel при Reload) во время генерации: всегда целая пара PFX + пароль.
+        var readers = Enumerable.Range(0, 2).Select(_ => Task.Run(() =>
+        {
+            start.SignalAndWait();
+            while (!stop.IsCancellationRequested)
+            {
+                var r = _loader.Load(settings);
+                if (r.Certificate is null) readErrors.Add(r.Error ?? "null");
+                r.Certificate?.Dispose();
+            }
+        })).ToArray();
+
+        await Task.WhenAll(writers);
+        stop.Cancel();
+        await Task.WhenAll(readers);
+
+        Assert.Empty(readErrors);
+        var final = _loader.Load(settings);
+        Assert.Null(final.Error);
+        Assert.Contains(final.Certificate!.Thumbprint, created);
+        // Временные файлы не остаются.
+        Assert.Equal(["https.pfx", "https.pfx.password"],
+            Directory.GetFiles(Path.Combine(_dir, "keys")).Select(f => Path.GetFileName(f)!).Order().ToArray());
+    }
+
+    [Fact]
     public void Missing_self_signed_certificate_is_reported()
     {
         var result = _loader.Load(new HttpsCertificateSettings(HttpsCertificateSource.SelfSigned));
