@@ -46,6 +46,13 @@ public sealed class FakeDirectory : IDirectoryService
         return Task.FromResult(Users.Values.Select(u => u.User).Concat(Groups).FirstOrDefault(o => o.Sid == sid));
     }
 
+    public Task<DirectoryObject?> FindByDnAsync(string dn, CancellationToken ct = default)
+    {
+        ThrowIfDown();
+        return Task.FromResult(Users.Values.Select(u => u.User).Concat(Groups)
+            .FirstOrDefault(o => string.Equals(o.DistinguishedName, DnUtils.Normalize(dn), StringComparison.OrdinalIgnoreCase)));
+    }
+
     public Task<IReadOnlyList<string>> GetTokenGroupsAsync(string userSid, CancellationToken ct = default)
     {
         ThrowIfDown();

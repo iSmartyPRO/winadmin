@@ -40,6 +40,13 @@ public sealed class LdapDirectoryServiceTests
     }
 
     [Fact]
+    public async Task Find_by_dn_with_disabled_directory_throws_unavailable()
+    {
+        var service = new LdapDirectoryService(Settings(DirectorySettings.Disabled));
+        await Assert.ThrowsAsync<DirectoryUnavailableException>(() => service.FindByDnAsync("CN=u,DC=x"));
+    }
+
+    [Fact]
     public async Task Unreachable_server_throws_unavailable()
     {
         var service = new LdapDirectoryService(Settings(new DirectorySettings(true, "invalid.example", "127.0.0.1", "DC=x", false)));
@@ -62,6 +69,7 @@ public sealed class LdapDirectoryServiceTests
         Assert.NotNull(user);
         Assert.StartsWith("S-1-5-21-", user!.Sid);
         Assert.Equal(user.Sid, (await ad.FindBySidAsync(user.Sid))!.Sid);
+        Assert.Equal(user.Sid, (await ad.FindByDnAsync(user.DistinguishedName!.ToLowerInvariant()))!.Sid);
         Assert.Contains(await ad.GetTokenGroupsAsync(user.Sid), g => g.EndsWith("-513")); // Domain Users
         Assert.NotEmpty(await ad.SearchAsync(user.SamAccountName, DirectoryObjectKind.User, 5));
         Assert.All(await ad.TestConnectionAsync(), s => Assert.True(s.Ok, s.Name + ": " + s.Message));

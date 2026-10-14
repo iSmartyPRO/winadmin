@@ -7,6 +7,8 @@ public interface IDirectoryService
 {
     Task<DirectoryObject?> FindUserAsync(string login, CancellationToken ct = default);
     Task<DirectoryObject?> FindBySidAsync(string sid, CancellationToken ct = default);
+    /// <summary>Пользователь или группа по distinguishedName (без учёта регистра); null — не найден.</summary>
+    Task<DirectoryObject?> FindByDnAsync(string dn, CancellationToken ct = default);
     /// <summary>SID всех групп пользователя (транзитивно, tokenGroups).</summary>
     Task<IReadOnlyList<string>> GetTokenGroupsAsync(string userSid, CancellationToken ct = default);
     Task<IReadOnlyList<DirectoryObject>> SearchAsync(string query, DirectoryObjectKind? kind, int limit, CancellationToken ct = default);
