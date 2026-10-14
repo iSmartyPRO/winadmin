@@ -27,10 +27,26 @@ public sealed class HttpsCertificateLoader(
         HttpsCertificateSource.Store => FromStore(settings),
         HttpsCertificateSource.Pfx => FromPfx(settings.Path, settings.Password, PfxPasswordPurpose,
             $"Файл PFX не найден: {settings.Path}"),
-        HttpsCertificateSource.SelfSigned => FromPfx(SelfSignedPath, ReadSelfSignedPassword(), SelfSignedPasswordPurpose,
-            "Самоподписанный сертификат не создан — создайте его (Настройки → Сеть → HTTPS или WinAdmin.exe network https --self-signed)."),
+        HttpsCertificateSource.SelfSigned => LoadSelfSigned(),
         _ => new(null, "Неизвестный источник сертификата."),
     };
+
+    /// <summary>
+    /// Общая блокировка для каталога ключей: генерация меняет пару «PFX + пароль» двумя переименованиями,
+    /// читатель не должен увидеть новый PFX со старым паролем, а два выпуска — перемешать файлы.
+    /// Ключ — каталог, чтобы разные экземпляры загрузчика в одном процессе тоже не мешали друг другу.
+    /// </summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, object> SelfSignedLocks =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    private object SelfSignedLock => SelfSignedLocks.GetOrAdd(Path.GetFullPath(keysDirectory), _ => new object());
+
+    private CertificateLoadResult LoadSelfSigned()
+    {
+        lock (SelfSignedLock)
+            return FromPfx(SelfSignedPath, ReadSelfSignedPassword(), SelfSignedPasswordPurpose,
+                "Самоподписанный сертификат не создан — создайте его (Настройки → Сеть → HTTPS или WinAdmin.exe network https --self-signed).");
+    }
 
     public CertificateValidation Validate(HttpsCertificateSettings settings)
     {
@@ -55,14 +71,30 @@ public sealed class HttpsCertificateLoader(
         using var cert = HttpsCertificates.CreateSelfSigned(dnsNames, _time.GetUtcNow());
         string password = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
 
-        Directory.CreateDirectory(keysDirectory);
-        string pfxTmp = SelfSignedPath + ".tmp", passwordTmp = SelfSignedPasswordPath + ".tmp";
-        File.WriteAllBytes(pfxTmp, cert.Export(X509ContentType.Pfx, password));
-        File.WriteAllText(passwordTmp, protector.Protect(password, SelfSignedPasswordPurpose));
-        foreach (string tmp in new[] { pfxTmp, passwordTmp })
-            InstallationHardening.ProtectFile(tmp, MasterKeyStore.KeyFileRules(), NullLogger.Instance);
-        File.Move(pfxTmp, SelfSignedPath, overwrite: true);
-        File.Move(passwordTmp, SelfSignedPasswordPath, overwrite: true);
+        byte[] pfx = cert.Export(X509ContentType.Pfx, password);
+        string protectedPassword = protector.Protect(password, SelfSignedPasswordPurpose);
+
+        lock (SelfSignedLock)
+        {
+            Directory.CreateDirectory(keysDirectory);
+            // Уникальные имена: параллельный выпуск (в том числе из другого процесса — CLI) не перепишет наши файлы.
+            string suffix = "." + Guid.NewGuid().ToString("N") + ".tmp";
+            string pfxTmp = SelfSignedPath + suffix, passwordTmp = SelfSignedPasswordPath + suffix;
+            try
+            {
+                File.WriteAllBytes(pfxTmp, pfx);
+                File.WriteAllText(passwordTmp, protectedPassword);
+                foreach (string tmp in new[] { pfxTmp, passwordTmp })
+                    InstallationHardening.ProtectFile(tmp, MasterKeyStore.KeyFileRules(), NullLogger.Instance);
+                File.Move(pfxTmp, SelfSignedPath, overwrite: true);
+                File.Move(passwordTmp, SelfSignedPasswordPath, overwrite: true);
+            }
+            finally
+            {
+                foreach (string tmp in new[] { pfxTmp, passwordTmp })
+                    try { File.Delete(tmp); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            }
+        }
         return HttpsCertificates.Describe(cert);
     }
 
@@ -83,7 +115,12 @@ public sealed class HttpsCertificateLoader(
 
     private CertificateLoadResult FromPfx(string? path, string? protectedPassword, string purpose, string notFound)
     {
-        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        if (string.IsNullOrWhiteSpace(path))
+            return new(null, notFound);
+        // До любого обращения к файлу: по UNC-пути LocalSystem аутентифицировался бы на чужом сервере.
+        if (!NetworkSettingsValidator.IsLocalDrivePath(path))
+            return new(null, $"Файл PFX должен лежать на локальном диске сервера (путь вида C:\\certs\\panel.pfx): {path}");
+        if (!File.Exists(path))
             return new(null, notFound);
 
         string? password = null;

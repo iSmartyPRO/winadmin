@@ -54,7 +54,7 @@ public sealed class DirectoryLoginApiTests(NetworkApiFactory factory)
     }
 
     [Fact]
-    public async Task Ad_password_over_https_from_network_is_accepted_with_secure_cookie_and_hsts()
+    public async Task Ad_password_over_https_from_network_is_accepted_with_secure_cookie_and_no_hsts_off_port_443()
     {
         string sam = await AdUserWithAccessAsync();
         var client = factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
@@ -69,7 +69,8 @@ public sealed class DirectoryLoginApiTests(NetworkApiFactory factory)
         Assert.Equal(HttpStatusCode.OK, r.StatusCode);
         string cookie = r.Headers.GetValues("Set-Cookie").Single(c => c.StartsWith("wa_refresh="));
         Assert.Contains("secure", cookie, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal("max-age=31536000", r.Headers.GetValues("Strict-Transport-Security").Single());
+        // Порт панели не 443 — HSTS не отправляется (он действовал бы на все порты имени хоста).
+        Assert.False(r.Headers.Contains("Strict-Transport-Security"));
     }
 
     [Fact]

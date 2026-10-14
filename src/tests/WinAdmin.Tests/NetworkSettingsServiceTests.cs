@@ -51,6 +51,20 @@ public sealed class NetworkSettingsServiceTests : IDisposable
     }
 
     [Fact]
+    public void Invalid_pfx_path_is_not_passed_to_certificate_loader()
+    {
+        var loader = new Mock<WinAdmin.Core.Abstractions.IHttpsCertificateLoader>(MockBehavior.Strict);
+        var service = new NetworkSettingsService(_store, _firewall.Object, _probe.Object, loader.Object);
+        var https = new HttpsSettings(true, new HttpsCertificateSettings(HttpsCertificateSource.Pfx, Path: @"\\attacker\s\x.pfx"));
+
+        var result = service.Check(new NetworkSettings(NetworkMode.Local, 8443, [], https));
+
+        Assert.False(result.Ok);
+        Assert.Contains(result.Errors, e => e.Contains("PFX"));
+        loader.VerifyNoOtherCalls();
+    }
+
+    [Fact]
     public void Apply_runs_firewall_then_writes_file_and_cleans_previous_port_rule()
     {
         IReadOnlyList<FirewallCommand>? ran = null;

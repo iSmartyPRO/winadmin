@@ -195,4 +195,48 @@ public sealed class NetworkCommandsTests : IDisposable
         Assert.Equal(1, await _root.InvokeAsync(["network", "https", "--enable", "--thumbprint", new string('A', 40), "--store", "Nowhere"]));
         Assert.False(_store.ReadOrDefault(out _).HttpsEnabled);
     }
+
+    // Служба работает как LocalSystem, CLI — от администратора: то, что видит CLI, служба может не увидеть.
+
+    [Fact]
+    public async Task Https_store_CurrentUser_is_rejected_because_service_runs_as_LocalSystem()
+    {
+        using var cert = TestCertificates.Valid("localhost");
+        _certs.Items.Add((CertificateStoreLocation.CurrentUser, cert));
+
+        int code = await _root.InvokeAsync(["network", "https", "--enable", "--thumbprint", cert.Thumbprint, "--store", "CurrentUser"]);
+
+        Assert.Equal(1, code);
+        Assert.Contains("LocalSystem", _err.ToString());
+        Assert.Contains(@"LocalMachine\My", _err.ToString());
+        Assert.False(_store.ReadOrDefault(out _).HttpsEnabled);
+    }
+
+    [Fact]
+    public async Task Https_pfx_on_unc_path_is_rejected()
+    {
+        int code = await _root.InvokeAsync(["network", "https", "--enable", "--pfx", @"\\127.0.0.1\winadmin-missing$\panel.pfx"]);
+
+        Assert.Equal(1, code);
+        Assert.Contains("локальном диске", _err.ToString());
+        Assert.False(_store.ReadOrDefault(out _).HttpsEnabled);
+    }
+
+    [Fact]
+    public void Service_account_check_rejects_current_user_store_and_network_drives()
+    {
+        static DriveType Network(string root) => root.StartsWith("Z", StringComparison.OrdinalIgnoreCase) ? DriveType.Network : DriveType.Fixed;
+
+        Assert.Contains("LocalSystem", NetworkCommands.ServiceAccountProblem(
+            new HttpsCertificateSettings(HttpsCertificateSource.Store, new string('A', 40), CertificateStoreLocation.CurrentUser), Network));
+        Assert.Null(NetworkCommands.ServiceAccountProblem(
+            new HttpsCertificateSettings(HttpsCertificateSource.Store, new string('A', 40), CertificateStoreLocation.LocalMachine), Network));
+        Assert.Contains("сетевом диске", NetworkCommands.ServiceAccountProblem(
+            new HttpsCertificateSettings(HttpsCertificateSource.Pfx, Path: @"Z:\certs\panel.pfx"), Network));
+        Assert.Contains("локальном диске", NetworkCommands.ServiceAccountProblem(
+            new HttpsCertificateSettings(HttpsCertificateSource.Pfx, Path: @"\\srv\share\panel.pfx"), Network));
+        Assert.Null(NetworkCommands.ServiceAccountProblem(
+            new HttpsCertificateSettings(HttpsCertificateSource.Pfx, Path: @"C:\certs\panel.pfx"), Network));
+        Assert.Null(NetworkCommands.ServiceAccountProblem(new HttpsCertificateSettings(HttpsCertificateSource.SelfSigned), Network));
+    }
 }
