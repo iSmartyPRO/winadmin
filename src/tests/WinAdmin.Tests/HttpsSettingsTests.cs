@@ -111,6 +111,7 @@ public sealed class HttpsSettingsTests : IDisposable
         Assert.Contains("\"https\"", json);
         Assert.Contains("\"selfSigned\"", json);
         Assert.Contains("\"httpRedirectPort\": 8080", json);
+        Assert.DoesNotContain("httpsEnabled", json); // вычисляемое свойство не пишется в файл
 
         var read = store.ReadOrDefault(out var error);
         Assert.Null(error);

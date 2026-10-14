@@ -45,7 +45,8 @@ public sealed record NetworkSettings(NetworkMode Mode, int Port, IReadOnlyList<s
 {
     public static NetworkSettings Default { get; } = new(NetworkMode.Local, 8080, []);
 
-    /// <summary>Основной порт обслуживается по HTTPS.</summary>
+    /// <summary>Основной порт обслуживается по HTTPS (вычисляется, в network.json не пишется).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
     public bool HttpsEnabled => Https is { Enabled: true };
 
     /// <summary>Сравнение по содержимому (record сравнивает списки по ссылке).</summary>
