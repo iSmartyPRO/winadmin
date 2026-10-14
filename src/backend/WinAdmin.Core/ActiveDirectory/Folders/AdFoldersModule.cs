@@ -49,15 +49,7 @@ public sealed class AdFoldersModule : IWinAdminModule, IModuleLifecycle
 
     public void ConfigureServices(IServiceCollection services, IConfiguration configuration) { }
 
-    public async Task OnFirstEnabledAsync(IServiceProvider services, CancellationToken ct)
-    {
-        var roles = services.GetRequiredService<IRoleService>();
-        var catalog = services.GetRequiredService<PermissionCatalog>();
-        if ((await roles.ListAsync(ct)).Any(r => string.Equals(r.Name, AdminRoleName, StringComparison.CurrentCultureIgnoreCase)))
-            return;
-        var system = new AccessContext(new PrincipalRef(PrincipalType.LocalUser, "system", []), "system",
-            PermissionEvaluator.Evaluate([new RoleSnapshot(BuiltInRoles.AdministratorId, true, [])], catalog));
-        await roles.CreateAsync(new SaveRoleRequest(AdminRoleName, "Шаблон: все действия с папками",
-            Permissions.Select(p => new RoleGrantDto(p.Id, null)).ToList()), system, ct);
-    }
+    public Task OnFirstEnabledAsync(IServiceProvider services, CancellationToken ct)
+        => AdRoleTemplates.EnsureAsync(services.GetRequiredService<IRoleService>(), services.GetRequiredService<PermissionCatalog>(),
+            AdRoleTemplates.Folders, ct);
 }

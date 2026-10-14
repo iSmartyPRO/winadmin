@@ -55,20 +55,7 @@ public sealed class AdUsersModule : IWinAdminModule, IModuleLifecycle
 
     public void ConfigureServices(IServiceCollection services, IConfiguration configuration) { }
 
-    public async Task OnFirstEnabledAsync(IServiceProvider services, CancellationToken ct)
-    {
-        var roles = services.GetRequiredService<IRoleService>();
-        var catalog = services.GetRequiredService<PermissionCatalog>();
-        var system = new AccessContext(new PrincipalRef(PrincipalType.LocalUser, "system", []), "system",
-            PermissionEvaluator.Evaluate([new RoleSnapshot(BuiltInRoles.AdministratorId, true, [])], catalog));
-        var existing = (await roles.ListAsync(ct)).Select(r => r.Name).ToHashSet(StringComparer.CurrentCultureIgnoreCase);
-
-        if (!existing.Contains(HrRoleName))
-            await roles.CreateAsync(new SaveRoleRequest(HrRoleName, "Шаблон: просмотр, правка атрибутов и перенос пользователей AD",
-                [new RoleGrantDto(PermissionIds.AdUsersRead, null), new RoleGrantDto(PermissionIds.AdUsersEdit, null),
-                 new RoleGrantDto(PermissionIds.AdUsersMove, null)]), system, ct);
-        if (!existing.Contains(AdminRoleName))
-            await roles.CreateAsync(new SaveRoleRequest(AdminRoleName, "Шаблон: все действия с пользователями AD",
-                Permissions.Select(p => new RoleGrantDto(p.Id, null)).ToList()), system, ct);
-    }
+    public Task OnFirstEnabledAsync(IServiceProvider services, CancellationToken ct)
+        => AdRoleTemplates.EnsureAsync(services.GetRequiredService<IRoleService>(), services.GetRequiredService<PermissionCatalog>(),
+            AdRoleTemplates.Users, ct);
 }
