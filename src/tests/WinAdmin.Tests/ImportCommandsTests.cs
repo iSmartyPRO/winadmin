@@ -28,6 +28,7 @@ public sealed class ImportCommandsTests : IDisposable
     private readonly FakeDirectory _directory = new();
     private readonly StringWriter _out = new();
     private readonly StringWriter _err = new();
+    private readonly FakeWindowsServiceStatus _service = new();
     private readonly RootCommand _root;
     private string? _connectionUsed;
 
@@ -61,7 +62,7 @@ public sealed class ImportCommandsTests : IDisposable
         _access.RolePrincipals.Add(new("super_admin", "group", "PortalAdmins", group.DistinguishedName!, "PortalAdmins"));
 
         var import = new Command("import");
-        ImportCommands.Register(import, _sp, cs => { _connectionUsed = cs; return _access; }, _out, _err);
+        ImportCommands.Register(import, _sp, cs => { _connectionUsed = cs; return _access; }, _out, _err, _service);
         _root = new RootCommand { import };
     }
 
@@ -125,6 +126,56 @@ public sealed class ImportCommandsTests : IDisposable
         Assert.DoesNotContain("   at ", output + err);
         Assert.DoesNotContain(Secret, output + err);
     }
+
+    [Theory]
+    [InlineData(WindowsServiceState.Running)]
+    [InlineData(WindowsServiceState.StartPending)]
+    public async Task Apply_is_refused_while_service_runs(WindowsServiceState state)
+    {
+        _service.State = state;
+
+        Assert.Equal(1, await Run("--apply"));
+
+        Assert.Contains("Остановите службу", _err.ToString());
+        Assert.Contains("--force", _err.ToString());
+        Assert.Equal(["WinAdmin"], _service.Queried);
+        Assert.Null((await _sp.GetRequiredService<IAdStructureStore>().GetAsync()).RootOu);
+    }
+
+    [Fact]
+    public async Task Force_applies_while_service_runs()
+    {
+        _service.State = WindowsServiceState.Running;
+
+        Assert.Equal(0, await Run("--apply", "--force"));
+
+        Assert.Equal("OU=Accounts,DC=GESCONS,DC=RU", (await _sp.GetRequiredService<IAdStructureStore>().GetAsync()).RootOu);
+    }
+
+    [Theory]
+    [InlineData(WindowsServiceState.Stopped)]
+    [InlineData(WindowsServiceState.NotInstalled)]
+    public async Task Apply_proceeds_when_service_is_stopped_or_not_installed(WindowsServiceState state)
+    {
+        _service.State = state;
+
+        Assert.Equal(0, await Run("--apply"));
+
+        Assert.Equal("OU=Accounts,DC=GESCONS,DC=RU", (await _sp.GetRequiredService<IAdStructureStore>().GetAsync()).RootOu);
+    }
+
+    [Fact]
+    public async Task Dry_run_works_while_service_runs()
+    {
+        _service.State = WindowsServiceState.Running;
+        Assert.Equal(0, await Run());
+        Assert.Contains("Будет создано", _out.ToString());
+    }
+
+    [Fact]
+    public void Missing_windows_service_is_reported_as_not_installed()
+        => Assert.Equal(WindowsServiceState.NotInstalled,
+            new WinAdmin.Infrastructure.Services.WindowsServiceStatus().GetState("WinAdmin-NoSuchService-" + Guid.NewGuid().ToString("N")[..8]));
 
     [Fact]
     public async Task Connection_option_is_required()
