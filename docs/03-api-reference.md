@@ -40,6 +40,29 @@ SSO текущим пользователем Windows. `404` — вход дом
 В `PUT` пароль передаётся полем `writePassword`: не передан или `null` — не менять, `""` — удалить, иначе — заменить.
 `rootOu` — DN вида `OU=…,DC=…`, иначе `400`. Аудит `settings.ad` (без пароля).
 
+### `GET /settings/network` · `PUT /settings/network` — право `platform.network.manage`
+`GET` → `{ mode: Local|Network, port, allow[], url, firewallRule, https }`, где
+`https = { enabled, source: Store|Pfx|SelfSigned, thumbprint, storeLocation: LocalMachine|CurrentUser, pfxPath,
+pfxPasswordSet, httpRedirectPort, certificate: { thumbprint, subject, issuer, dnsNames[], notBefore, notAfter,
+hasPrivateKey, storeLocation }, certificateError }`. Пароль PFX не возвращается — только `pfxPasswordSet`.
+
+`PUT` → `{ mode, port, allow[], https? }`; `https = { enabled, source, thumbprint, storeLocation, pfxPath,
+pfxPassword, httpRedirectPort }`. `https` не передан — HTTPS не меняется; `source: null` — прежний сертификат;
+`pfxPassword: null` — прежний пароль (`""` — PFX без пароля); `httpRedirectPort` `null`/`0` — без перенаправления.
+Ответ `200 { url }` (новый адрес, `https://…` при включённом HTTPS), применение — после отправки ответа, откат через
+10 с, если порт не слушается или не проходит TLS-рукопожатие. Ошибки: `400 { message, errors[] }` (в т. ч. сертификат
+не найден, без закрытого ключа, истёк, не для проверки подлинности сервера), `409` — порт (основной или
+перенаправления) занят. Аудит `settings.network` (без пароля), `settings.network.rollback`.
+
+### `GET /settings/network/certificates` — право `platform.network.manage`
+Сертификаты с закрытым ключом из `LocalMachine\My` и `CurrentUser\My` (хранилище учётки службы):
+`[{ thumbprint, subject, issuer, dnsNames[], notBefore, notAfter, hasPrivateKey, storeLocation }]`.
+
+### `POST /settings/network/https/self-signed` — право `platform.network.manage`
+`{ dnsNames?: [] }` → `200 CertificateInfo`. Выпускает самоподписанный сертификат (RSA 2048, 2 года; SAN — полное и
+короткое имя компьютера, `localhost` и переданные имена) в `keys\https.pfx`, заменяя прежний; если HTTPS уже работает на
+самоподписанном, новый применяется сразу. Не DNS-имя — `400`. Аудит `settings.network.https.selfsigned`.
+
 ### `GET /environment?module=<id>&depth=quick|full` — право `platform.environment.check`
 Запускает проверки: без `module` — платформа и включённые модули. Ответ:
 `[{ moduleId, at, overall: Ok|Warning|Failed, results: [{ code, title, status: Ok|Warning|Failed|Skipped, message, fix }] }]`.
