@@ -41,6 +41,7 @@ public sealed class AccessImporter(
 
     private readonly List<Step> _steps = [];
     private readonly List<Func<CancellationToken, Task>> _settingsActions = [];
+    private bool _portalUsers;
 
     /// <summary>«LDAP://host/OU=…,DC=…», «LDAP://OU=…» или DN → нормализованный DN; пусто — null.</summary>
     public static string? ParseLdapPath(string? ldapPath)
@@ -59,6 +60,7 @@ public sealed class AccessImporter(
     {
         _steps.Clear();
         _settingsActions.Clear();
+        _portalUsers = false;
 
         var app = await source.GetAppSettingsAsync(ct);
         var current = await structure.GetAsync(ct);
@@ -149,7 +151,7 @@ public sealed class AccessImporter(
         string? root = ParseLdapPath(app.LdapPath);
         if (root is null)
             Add("Корневая OU", "app_settings.ldap_path", to, ImportStatus.NotImported, "в Access не задан");
-        else if (!root.StartsWith("OU=", StringComparison.OrdinalIgnoreCase))
+        else if (!IsOuDn(root))
             Add("Корневая OU", $"app_settings.ldap_path: {root}", to, ImportStatus.NotImported,
                 "WinAdmin требует OU (OU=…,DC=…) — задайте корневую OU вручную");
         else
@@ -337,6 +339,7 @@ public sealed class AccessImporter(
                 Add(what, from, string.Join(", ", targets.Select(t => $"«{t}»")), ImportStatus.NotFoundInAd);
                 continue;
             }
+            _portalUsers = true;
             PlanAssign(what, from, targets, found, existing);
         }
     }
@@ -419,6 +422,9 @@ public sealed class AccessImporter(
             .Where(m => !modules.GetState(m.Id).Enabled).Select(m => $"«{m.Title}»").ToList();
         if (disabled.Count > 0)
             report.Hints.Add($"Включите модули {string.Join(" и ", disabled)} (Настройки → Модули), затем проверьте окружение.");
+        if (_portalUsers)
+            report.Hints.Add("В Access роль из portal_users заменяла роль из групп, в WinAdmin роли суммируются — " +
+                             "проверьте в «Роли», что у этих пользователей нет лишних ролей через группы.");
         if (!options.Apply)
             report.Hints.Add("Это только отчёт. Для импорта повторите команду с --apply.");
         else if (_settingsActions.Count > 0)
@@ -510,6 +516,20 @@ public sealed class AccessImporter(
         try
         {
             return string.Equals(DirectoryLogin.Parse(a).Sam, DirectoryLogin.Parse(b).Sam, StringComparison.OrdinalIgnoreCase);
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Годится ли DN как корневая OU WinAdmin (те же правила, что AdStructureSettings.Normalize).</summary>
+    private static bool IsOuDn(string dn)
+    {
+        try
+        {
+            (AdStructureSettings.Default with { RootOu = dn }).Normalize();
+            return true;
         }
         catch (ArgumentException)
         {

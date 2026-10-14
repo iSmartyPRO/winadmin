@@ -129,6 +129,7 @@ public sealed class AccessImporterTests : IDisposable
         Assert.Equal(ImportStatus.NotImported, Row(report, "Exchange").Status);
         Assert.Equal(ImportStatus.NotImported, Row(report, "Журнал аудита").Status);
         Assert.Contains(report.Hints, h => h.Contains("Пользователи AD") && h.Contains("Папки"));
+        Assert.Contains(report.Hints, h => h.Contains("portal_users") && h.Contains("суммируются"));
 
         Assert.Null((await Get<IAdStructureStore>().GetAsync()).RootOu);
         Assert.Empty(await AssignmentsAsync());
@@ -269,10 +270,12 @@ public sealed class AccessImporterTests : IDisposable
     public void Ldap_path_is_parsed_to_dn(string ldapPath, string? dn)
         => Assert.Equal(dn, AccessImporter.ParseLdapPath(ldapPath));
 
-    [Fact]
-    public async Task Domain_root_ldap_path_is_not_imported()
+    [Theory]
+    [InlineData("LDAP://DC=GESCONS,DC=RU")]
+    [InlineData("LDAP://OU=Accounts")]
+    public async Task Ldap_path_that_is_not_an_ou_dn_is_not_imported(string ldapPath)
     {
-        _access.AppSettings = _access.AppSettings! with { LdapPath = "LDAP://DC=GESCONS,DC=RU" };
+        _access.AppSettings = _access.AppSettings! with { LdapPath = ldapPath };
         var report = await RunAsync(new AccessImportOptions(Apply: true));
         Assert.Equal(ImportStatus.NotImported, Row(report, "Корневая OU").Status);
         Assert.Null((await Get<IAdStructureStore>().GetAsync()).RootOu);
