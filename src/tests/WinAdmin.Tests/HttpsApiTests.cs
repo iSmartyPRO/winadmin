@@ -127,6 +127,15 @@ public sealed class HttpsApiTests(NetworkApiFactory factory)
         Assert.Contains("DNS", await bad.Content.ReadAsStringAsync());
     }
 
+    [Fact]
+    public async Task Platform_environment_report_includes_https_check()
+    {
+        var client = await factory.ClientWithPermissionsAsync(PermissionIds.PlatformEnvironmentCheck);
+        var reports = await client.GetFromJsonAsync<List<JsonElement>>("/api/v1/environment?module=platform", JsonOpts);
+        var platform = Assert.Single(reports!);
+        Assert.Contains(platform.GetProperty("results").EnumerateArray(), r => r.GetProperty("code").GetString() == "platform.https");
+    }
+
     private async Task<AuditEntryDto?> WaitForAuditAsync(string detail, string? mustNotContain = null)
     {
         for (int i = 0; i < 150; i++)
