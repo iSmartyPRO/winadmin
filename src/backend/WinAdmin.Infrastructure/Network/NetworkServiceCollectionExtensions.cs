@@ -11,6 +11,11 @@ public static class NetworkServiceCollectionExtensions
         services.AddSingleton(store);
         services.AddSingleton<IFirewallRunner, NetshFirewallRunner>();
         services.AddSingleton<IPortProbe, SystemPortProbe>();
+        services.AddSingleton<ICertificateStore, SystemCertificateStore>();
+        // Каталог ключей — keys рядом с network.json (там же master.key); пароль PFX шифруется ISecretProtector.
+        services.AddSingleton<IHttpsCertificateLoader>(sp => new HttpsCertificateLoader(
+            sp.GetRequiredService<ICertificateStore>(), sp.GetRequiredService<ISecretProtector>(),
+            Path.Combine(store.DataDirectory, "keys")));
         services.AddSingleton<INetworkSettingsService, NetworkSettingsService>();
         return services;
     }

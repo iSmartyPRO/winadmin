@@ -16,6 +16,9 @@ public sealed class NetworkCommandsTests : IDisposable
     private readonly StringWriter _out = new();
     private readonly StringWriter _err = new();
     private readonly RootCommand _root;
+    private readonly FakeCertificateStore _certs = new();
+    private readonly WinAdmin.Core.Abstractions.ISecretProtector _protector =
+        new WinAdmin.Infrastructure.Secrets.AesGcmSecretProtector(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
 
     public NetworkCommandsTests()
     {
@@ -26,6 +29,8 @@ public sealed class NetworkCommandsTests : IDisposable
         services.AddWinAdminNetwork(_store);
         services.AddSingleton(_firewall.Object);
         services.AddSingleton(_probe.Object);
+        services.AddSingleton<WinAdmin.Core.Abstractions.ISecretProtector>(_protector);
+        services.AddSingleton<ICertificateStore>(_certs);
         var provider = services.BuildServiceProvider();
 
         var network = new Command("network");

@@ -26,7 +26,7 @@ public static class FirewallCommands
             [
                 "advfirewall", "firewall", "add", "rule",
                 $"name={ManagedRuleName}", "dir=in", "action=allow", "protocol=TCP",
-                $"localport={settings.Port}",
+                $"localport={string.Join(',', new[] { settings.Port, NetworkEndpoints.RedirectPort(settings) }.OfType<int>())}",
                 $"remoteip={string.Join(',', settings.Allow)}",
                 "profile=domain,private",
             ], IgnoreFailure: false));

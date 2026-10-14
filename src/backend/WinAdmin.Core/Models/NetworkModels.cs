@@ -55,10 +55,39 @@ public sealed record NetworkSettings(NetworkMode Mode, int Port, IReadOnlyList<s
 }
 
 /// <summary>Текущие сетевые настройки для UI.</summary>
-public sealed record NetworkSettingsDto(NetworkMode Mode, int Port, IReadOnlyList<string> Allow, string Url, bool FirewallRule);
+public sealed record NetworkSettingsDto(NetworkMode Mode, int Port, IReadOnlyList<string> Allow, string Url, bool FirewallRule,
+    HttpsSettingsDto? Https = null);
 
-/// <summary>Запрос на изменение сетевых настроек.</summary>
-public sealed record UpdateNetworkSettingsRequest(NetworkMode Mode, int Port, List<string>? Allow);
+/// <summary>Настройки HTTPS для UI: пароль PFX наружу не отдаётся — только «задан/не задан».</summary>
+public sealed record HttpsSettingsDto(
+    bool Enabled,
+    HttpsCertificateSource? Source,
+    string? Thumbprint,
+    CertificateStoreLocation? StoreLocation,
+    string? PfxPath,
+    bool PfxPasswordSet,
+    int? HttpRedirectPort,
+    CertificateInfo? Certificate,
+    string? CertificateError);
+
+/// <summary>Запрос на изменение сетевых настроек (Https = null — HTTPS не меняется).</summary>
+public sealed record UpdateNetworkSettingsRequest(NetworkMode Mode, int Port, List<string>? Allow, UpdateHttpsRequest? Https = null);
+
+/// <summary>
+/// Изменение HTTPS. Source = null — прежний сертификат; PfxPassword = null — прежний пароль
+/// (пустая строка — PFX без пароля); HttpRedirectPort null или 0 — без перенаправления.
+/// </summary>
+public sealed record UpdateHttpsRequest(
+    bool Enabled,
+    HttpsCertificateSource? Source = null,
+    string? Thumbprint = null,
+    CertificateStoreLocation? StoreLocation = null,
+    string? PfxPath = null,
+    string? PfxPassword = null,
+    int? HttpRedirectPort = null);
+
+/// <summary>Запрос на выпуск самоподписанного сертификата (дополнительные DNS-имена).</summary>
+public sealed record CreateSelfSignedRequest(List<string>? DnsNames);
 
 /// <summary>Результат изменения: новый адрес панели.</summary>
 public sealed record NetworkUpdateResult(string Url);

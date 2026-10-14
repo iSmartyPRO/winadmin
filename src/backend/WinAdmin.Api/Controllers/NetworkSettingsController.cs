@@ -57,7 +57,7 @@ public sealed class NetworkSettingsController : WinAdminControllerBase
         if (check.Errors.Count > 0)
             return BadRequest(new { message = check.Errors[0], errors = check.Errors });
         if (check.PortBusy)
-            return Conflict(new { message = $"Порт {check.Normalized.Port} уже занят другой программой." });
+            return Conflict(new { message = $"Порт {check.BusyPort} уже занят другой программой." });
 
         var next = check.Normalized;
         string url = NetworkEndpoints.PanelUrl(next, Request.Host.Host);

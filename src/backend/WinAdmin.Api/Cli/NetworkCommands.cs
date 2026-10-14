@@ -74,7 +74,7 @@ public static class NetworkCommands
             foreach (var message in check.Errors)
                 error.WriteLine(message);
             if (check.PortBusy)
-                error.WriteLine($"Порт {check.Normalized.Port} уже занят другой программой.");
+                error.WriteLine($"Порт {check.BusyPort} уже занят другой программой.");
             if (!check.Ok)
             {
                 ctx.ExitCode = 1;
