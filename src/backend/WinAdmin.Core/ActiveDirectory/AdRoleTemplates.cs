@@ -27,9 +27,9 @@ public static class AdRoleTemplates
 
     public static IReadOnlyList<SaveRoleRequest> All { get; } = [.. Users, .. Folders];
 
-    /// <summary>Действующее лицо «system» с правами администратора — для служебного создания ролей.</summary>
-    public static IAccessContext SystemContext(PermissionCatalog catalog)
-        => new AccessContext(new PrincipalRef(PrincipalType.LocalUser, "system", []), "system",
+    /// <summary>Служебное действующее лицо с правами администратора (для создания ролей и назначений без входа).</summary>
+    public static IAccessContext SystemContext(PermissionCatalog catalog, string actor = "system")
+        => new AccessContext(new PrincipalRef(PrincipalType.LocalUser, actor, []), actor,
             PermissionEvaluator.Evaluate([new RoleSnapshot(BuiltInRoles.AdministratorId, true, [])], catalog));
 
     /// <summary>Создаёт шаблоны, которых ещё нет (по имени без учёта регистра); существующие не трогает. Возвращает созданные имена.</summary>
